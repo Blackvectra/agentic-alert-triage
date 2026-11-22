@@ -119,3 +119,18 @@ def test_projection_counts_the_held_out_cases_that_exist(tmp_path, capsys, monke
 def test_dry_run_says_split_and_family_are_ignored(tmp_path, capsys):
     run.main(["--dry-run", "--split", "heldout", "--family", "suspicious_auth", "--out", str(tmp_path / "w")])
     assert "--dry-run always uses AUTH-001; ignoring --split/--family" in capsys.readouterr().out
+
+
+def test_resume_reruns_runs_made_with_different_prompts_or_tools(tmp_path):
+    # Colab reused an old run folder: 9 runs from older code were "done", so nothing ran.
+    out = tmp_path / "stale"
+    run.main(["--dry-run", "--out", str(out)])
+    logs = lines(out / "logs.jsonl")
+    logs[0]["prompt_sha256"] = "0" * 64   # as if made before a tool change (ADR 0005)
+    _rewrite(out / "logs.jsonl", logs)
+
+    run.main(["--dry-run", "--out", str(out)])
+
+    again = lines(out / "logs.jsonl")
+    assert len(again) == 9 and len(lines(out / "scores.jsonl")) == 9
+    assert all(l["prompt_sha256"] != "0" * 64 for l in again)

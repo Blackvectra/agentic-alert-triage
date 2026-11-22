@@ -14,7 +14,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .agent import Final, OllamaModel, ScriptedModel, ToolCall, run_case
+from .agent import Final, OllamaModel, ScriptedModel, ToolCall, prompt_fingerprint, run_case
 from .fixtures import ROOT, VARIANTS, build_view, load_cases
 from .jsonl import read_jsonl
 from .score import score_run
@@ -69,8 +69,11 @@ def _prepare_resume(out_dir: Path) -> set:
     logs = read_jsonl(logs_path) if logs_path.exists() else []
     scores = read_jsonl(scores_path) if scores_path.exists() else []
     scored = {_key(s) for s in scores}
+    # Done = scored, no harness error, and made with the current prompts and tools.
+    current = {cfg: prompt_fingerprint(cfg) for cfg in CONFIGS}
     done = {_key(l) for l in logs
-            if _key(l) in scored and (l["error"] is None or l["error"] in MODEL_OUTCOME_ERRORS)}
+            if _key(l) in scored and (l["error"] is None or l["error"] in MODEL_OUTCOME_ERRORS)
+            and l.get("prompt_sha256") == current.get(l["config"])}
 
     def keep(rows):
         seen, kept = set(), []
