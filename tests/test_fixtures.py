@@ -102,12 +102,13 @@ def test_required_evidence_is_reachable_with_the_tools():
 
 def test_summary_leak_finds_withheld_facts_only_the_hidden_record_holds():
     from triage.fixtures import summary_leaks
-    case = {"alert": {"summary": "jdoe failed for 41 accounts at 02:55Z from Fargo, US."},
+    case = {"alert": {"summary": "jdoe failed for 41 accounts at 02:55Z from Fargo, US, a role change."},
             "evidence": {"events": [
-                {"evidence_id": "E-1", "time": "2026-04-09T02:55:00Z", "accounts_targeted": 41, "geo": "Fargo, US"},
+                {"evidence_id": "E-1", "kind": "role", "time": "2026-04-09T02:55:00Z", "accounts_targeted": 41, "geo": "Fargo, US"},
                 {"evidence_id": "E-2", "geo": "Fargo, US", "privileged": False}]},
             "variants": {"withheld": {"withhold_ids": ["E-1"]}}}
-    # Fargo is also in a visible record, so naming it reveals nothing hidden.
+    # Fargo is also in a visible record, so naming it reveals nothing hidden;
+    # "kind" labels the record type, so it is not a fact either.
     assert summary_leaks(case) == {"E-1": ["02:55", "41"]}
 
 

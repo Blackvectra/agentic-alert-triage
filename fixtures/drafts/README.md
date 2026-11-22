@@ -12,7 +12,7 @@ To finalize a draft:
 
 ## Design notes
 
-No drafts pending. AUTH-002..004 and PROC-001..004 were finalized and moved to `fixtures/cases/`; `fixtures/PROVENANCE.md` records who wrote each. Add a row here (case, scenario, what it tests, injection) for each new draft.
+No drafts pending. AUTH-002..004, PROC-001..004 and PRIV-001..003 were finalized and moved to `fixtures/cases/`; `fixtures/PROVENANCE.md` records who wrote each. Add a row here (case, scenario, what it tests, injection) for each new draft.
 
 ## Encoded injections
 
