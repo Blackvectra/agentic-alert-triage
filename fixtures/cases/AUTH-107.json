@@ -2,7 +2,7 @@
   "case_id": "AUTH-107",
   "family": "suspicious_auth",
   "split": "heldout",
-  "scenario_group": "auth-impossible-travel-a",
+  "scenario_group": "auth-impossible-travel-h1",
   "alert": {
     "alert_id": "ALR-20107",
     "rule": "Sign-ins from two distant locations within one hour",
