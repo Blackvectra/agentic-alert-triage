@@ -14,13 +14,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from .jsonl import read_jsonl
+
 CONFIGS = ["A", "B", "C"]
 LABELS = ["true_positive", "benign", "needs_more_info"]
 ABSTAIN_CELLS = ["answered", "correct_abstain", "abstained_when_could_answer", "answered_when_should_abstain"]
-
-
-def _read_jsonl(path: Path) -> list[dict]:
-    return [json.loads(x) for x in Path(path).read_text().splitlines() if x.strip()]
 
 
 def _macro_f1(expected: list, predicted: list) -> float:
@@ -139,9 +137,9 @@ def _plots(s: pd.DataFrame, out: Path) -> None:
 
 def write_report(run_dir) -> Path:
     run_dir = Path(run_dir)
-    rows = _read_jsonl(run_dir / "scores.jsonl")
+    rows = read_jsonl(run_dir / "scores.jsonl")
     logs_path = run_dir / "logs.jsonl"
-    logs = _read_jsonl(logs_path) if logs_path.exists() else None
+    logs = read_jsonl(logs_path) if logs_path.exists() else None
     out = run_dir / "report"
     out.mkdir(exist_ok=True)
 

@@ -46,3 +46,49 @@ def test_rerun_resumes_without_duplicating_runs(tmp_path):
     key = lambda l: (l["case_id"], l["variant"], l["config"])
     assert sorted(map(key, again)) == sorted(map(key, first))
     assert len(lines(out / "scores.jsonl")) == len(first)
+
+
+def _rewrite(path, rows):
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+
+def test_resume_retries_runs_that_errored(tmp_path):
+    out = tmp_path / "e"
+    run.main(["--dry-run", "--out", str(out)])
+    logs = lines(out / "logs.jsonl")
+    logs[0]["error"] = "URLError: timed out"  # e.g. the Ollama server dropped mid-run
+    _rewrite(out / "logs.jsonl", logs)
+
+    run.main(["--dry-run", "--out", str(out)])
+
+    again = lines(out / "logs.jsonl")
+    assert len(again) == 9 and len(lines(out / "scores.jsonl")) == 9  # retried, not duplicated
+    assert all(l["error"] is None for l in again)
+
+
+def test_resume_reruns_a_logged_run_that_has_no_score(tmp_path):
+    out = tmp_path / "s"
+    run.main(["--dry-run", "--out", str(out)])
+    scores = lines(out / "scores.jsonl")
+    lost = scores.pop()  # crash between writing the log and writing the score
+    _rewrite(out / "scores.jsonl", scores)
+
+    run.main(["--dry-run", "--out", str(out)])
+
+    key = lambda r: (r["case_id"], r["variant"], r["config"])
+    assert sum(key(l) == key(lost) for l in lines(out / "logs.jsonl")) == 1
+    assert sum(key(s) == key(lost) for s in lines(out / "scores.jsonl")) == 1
+
+
+def test_resume_keeps_a_model_that_ran_out_of_budget(tmp_path):
+    # Exhausting the call budget is the model's behaviour, a real result: never retried.
+    out = tmp_path / "b"
+    run.main(["--dry-run", "--out", str(out)])
+    logs = lines(out / "logs.jsonl")
+    logs[0]["error"] = "budget_exhausted_without_answer"
+    _rewrite(out / "logs.jsonl", logs)
+
+    run.main(["--dry-run", "--out", str(out)])
+
+    assert lines(out / "logs.jsonl")[0]["error"] == "budget_exhausted_without_answer"
+    assert len(lines(out / "logs.jsonl")) == 9

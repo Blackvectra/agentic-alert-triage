@@ -16,6 +16,7 @@ from pathlib import Path
 
 from .agent import Final, OllamaModel, ScriptedModel, ToolCall, run_case
 from .fixtures import ROOT, VARIANTS, build_view, load_cases
+from .jsonl import read_jsonl
 from .score import score_run
 
 CONFIGS = ("A", "B", "C")
@@ -49,11 +50,39 @@ def get_model(name: str, host: str = "http://localhost:11434"):
     raise SystemExit(f"unknown model '{name}': use scripted-demo, ollama:<tag> or anthropic:<model-id>")
 
 
-def _done_keys(path: Path) -> set:
-    if not path.exists():
-        return set()
-    return {(r["case_id"], r["variant"], r["config"])
-            for r in (json.loads(x) for x in path.read_text().splitlines() if x.strip())}
+# A harness failure (exception, timeout, dropped server) is retried on resume.
+# Running out of tool calls is the model's own behaviour and stays as a result.
+MODEL_OUTCOME_ERRORS = {"budget_exhausted_without_answer"}
+
+
+def _key(row: dict) -> tuple:
+    return (row["case_id"], row["variant"], row["config"])
+
+
+def _prepare_resume(out_dir: Path) -> set:
+    """Keep only complete runs (a log without a harness error AND a score) and return their keys.
+
+    Incomplete runs are removed from both files so they are rerun once, never duplicated.
+    """
+    logs_path, scores_path = out_dir / "logs.jsonl", out_dir / "scores.jsonl"
+    logs = read_jsonl(logs_path) if logs_path.exists() else []
+    scores = read_jsonl(scores_path) if scores_path.exists() else []
+    scored = {_key(s) for s in scores}
+    done = {_key(l) for l in logs
+            if _key(l) in scored and (l["error"] is None or l["error"] in MODEL_OUTCOME_ERRORS)}
+
+    def keep(rows):
+        seen, kept = set(), []
+        for r in rows:
+            if _key(r) in done and _key(r) not in seen:
+                seen.add(_key(r))
+                kept.append(r)
+        return kept
+
+    for path, rows in ((logs_path, logs), (scores_path, scores)):
+        if path.exists():
+            path.write_text("".join(json.dumps(r) + "\n" for r in keep(rows)))
+    return done
 
 
 def _print_projection(logs: list[dict], price_in: float | None, price_out: float | None) -> None:
@@ -105,7 +134,7 @@ def main(argv=None) -> None:
     else:
         cases = load_cases(args.split, args.family)
 
-    done = _done_keys(out_dir / "logs.jsonl")
+    done = _prepare_resume(out_dir)
     new_logs = []
     with open(out_dir / "logs.jsonl", "a") as logs, open(out_dir / "scores.jsonl", "a") as scores:
         for case in cases:
