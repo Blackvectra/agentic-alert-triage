@@ -9,3 +9,4 @@ Who wrote each finalized case and its expected answers, for the report's method 
 | AUTH-003 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
 | AUTH-004 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
 | PROC-001 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
+| PROC-002 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
