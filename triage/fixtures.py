@@ -106,7 +106,7 @@ def _facts(record: dict) -> set[str]:
 
     out = set()
     for key, value in record.items():
-        if key == "evidence_id" or isinstance(value, bool):
+        if key in ("evidence_id", "kind") or isinstance(value, bool):
             continue
         for v in (value if isinstance(value, list) else [value]):
             text = str(v)
