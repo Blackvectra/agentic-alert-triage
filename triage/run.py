@@ -1,6 +1,11 @@
-"""Run case x variant x config and write one JSONL log line per run, then score.
+"""Run case x variant x config, write one JSONL log line per run, then score.
 
-  python -m triage.run --split dev --family suspicious_auth --model scripted-demo
+  python -m triage.run --split dev --family suspicious_auth                 # free scripted demo
+  python -m triage.run --model ollama:qwen2.5:7b --dry-run                  # 9 real runs on AUTH-001
+  python -m triage.run --model ollama:qwen2.5:7b --split heldout --out runs/heldout   # resumable
+
+Re-running with the same --out skips runs already logged, so an interrupted
+session (e.g. a Colab disconnect) picks up where it stopped.
 """
 from __future__ import annotations
 
@@ -9,15 +14,17 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .agent import Final, ScriptedModel, ToolCall, run_case
+from .agent import Final, OllamaModel, ScriptedModel, ToolCall, run_case
 from .fixtures import ROOT, VARIANTS, build_view, load_cases
 from .score import score_run
 
 CONFIGS = ("A", "B", "C")
+HELDOUT_RUNS = 30 * len(VARIANTS) * len(CONFIGS)  # the planned held-out pass: 270
+DRY_RUN_CASE = "AUTH-001"
 
 
 def demo_model() -> ScriptedModel:
-    """Fixed script to exercise the harness end to end without an API key."""
+    """Fixed script to exercise the harness end to end without any model."""
     answer = {"disposition": "true_positive", "abstain": False, "summary": "demo",
               "claims": [{"text": "MFA denied then approved from new IP", "evidence_ids": ["E-EVT-002", "E-EVT-003"]}],
               "proposed_actions": []}
@@ -25,33 +32,100 @@ def demo_model() -> ScriptedModel:
                                  Final(json.dumps(answer))], name="scripted-demo")
 
 
-def get_model(name: str):
+def get_model(name: str, host: str = "http://localhost:11434"):
+    """Return a factory that makes a fresh model per run (adapters keep per-run state)."""
     if name == "scripted-demo":
         return demo_model
-    raise SystemExit(f"model '{name}' not wired up yet: add an adapter in triage/agent.py")
+    if name.startswith("ollama:"):
+        tag = name.split(":", 1)[1]
+        return lambda: OllamaModel(model_id=tag, host=host)
+    if name.startswith("anthropic:"):
+        import anthropic  # optional dependency: pip install -e ".[anthropic]"
+
+        from .agent import AnthropicModel
+        client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
+        model_id = name.split(":", 1)[1]
+        return lambda: AnthropicModel(client=client, model_id=model_id)
+    raise SystemExit(f"unknown model '{name}': use scripted-demo, ollama:<tag> or anthropic:<model-id>")
+
+
+def _done_keys(path: Path) -> set:
+    if not path.exists():
+        return set()
+    return {(r["case_id"], r["variant"], r["config"])
+            for r in (json.loads(x) for x in path.read_text().splitlines() if x.strip())}
+
+
+def _print_projection(logs: list[dict], price_in: float | None, price_out: float | None) -> None:
+    n = len(logs)
+    print(f"\n{'config':6} {'runs':>4} {'in tok/run':>11} {'out tok/run':>12} {'sec/run':>8} {'steps/run':>10}")
+    for cfg in CONFIGS:
+        rs = [l for l in logs if l["config"] == cfg]
+        if not rs:
+            continue
+        k = len(rs)
+        print(f"{cfg:6} {k:>4} {sum(l['input_tokens'] for l in rs) / k:>11.0f} "
+              f"{sum(l['output_tokens'] for l in rs) / k:>12.0f} {sum(l['latency_s'] for l in rs) / k:>8.1f} "
+              f"{sum(len(l.get('stop_reasons', [])) for l in rs) / k:>10.1f}")
+    scale = HELDOUT_RUNS / n
+    tin = sum(l["input_tokens"] for l in logs) * scale
+    tout = sum(l["output_tokens"] for l in logs) * scale
+    hours = sum(l["latency_s"] for l in logs) * scale / 3600
+    print(f"\nprojected for {HELDOUT_RUNS} runs: {tin:,.0f} input tokens, {tout:,.0f} output tokens, "
+          f"~{hours:.1f} hours of model time")
+    if price_in is not None and price_out is not None:
+        print(f"projected cost: ${(tin * price_in + tout * price_out) / 1e6:,.2f} "
+              f"(at ${price_in}/M input, ${price_out}/M output)")
+    print("Projection assumes held-out cases behave like this sample; treat it as a rough estimate.")
 
 
 def main(argv=None) -> None:
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--split", choices=["dev", "heldout"], default="dev")
     ap.add_argument("--family")
-    ap.add_argument("--model", default="scripted-demo")
+    ap.add_argument("--model", default="scripted-demo", help="scripted-demo | ollama:<tag> | anthropic:<model-id>")
+    ap.add_argument("--host", default="http://localhost:11434", help="Ollama server URL")
+    ap.add_argument("--out", help="output directory; reuse it to resume an interrupted run")
+    ap.add_argument("--dry-run", action="store_true", help=f"run {DRY_RUN_CASE} only and project to {HELDOUT_RUNS} runs")
+    ap.add_argument("--price-in", type=float, help="USD per million input tokens (paid models only)")
+    ap.add_argument("--price-out", type=float, help="USD per million output tokens (paid models only)")
     args = ap.parse_args(argv)
 
-    make_model = get_model(args.model)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out_dir = ROOT / "runs" / f"{stamp}_{args.split}_{args.model}"
-    out_dir.mkdir(parents=True)
-    cases = load_cases(args.split, args.family)
-    with open(out_dir / "logs.jsonl", "w") as logs, open(out_dir / "scores.jsonl", "w") as scores:
+    make_model = get_model(args.model, args.host)
+    if args.out:
+        out_dir = Path(args.out)
+    else:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        label = "dryrun" if args.dry_run else args.split
+        out_dir = ROOT / "runs" / f"{stamp}_{label}_{args.model.replace(':', '-')}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.dry_run:
+        cases = [c for c in load_cases() if c["case_id"] == DRY_RUN_CASE]
+    else:
+        cases = load_cases(args.split, args.family)
+
+    done = _done_keys(out_dir / "logs.jsonl")
+    new_logs = []
+    with open(out_dir / "logs.jsonl", "a") as logs, open(out_dir / "scores.jsonl", "a") as scores:
         for case in cases:
             for variant in VARIANTS:
                 view = build_view(case, variant)
                 for config in CONFIGS:
+                    if (case["case_id"], variant, config) in done:
+                        continue
                     log = run_case(case, variant, config, make_model(), view)  # fresh model per run
                     logs.write(json.dumps(log) + "\n")
                     scores.write(json.dumps(score_run(log, case)) + "\n")
-    print(f"{len(cases) * len(VARIANTS) * len(CONFIGS)} runs -> {out_dir}")
+                    logs.flush(), scores.flush()  # survive a disconnect mid-batch
+                    new_logs.append(log)
+                    print(f"{case['case_id']} {variant:9} {config}  {log['latency_s']:6.1f}s  "
+                          f"error={log['error']}", flush=True)
+
+    total = len(cases) * len(VARIANTS) * len(CONFIGS)
+    print(f"{len(new_logs)} new runs, {total - len(new_logs)} already done -> {out_dir}")
+    if args.dry_run and new_logs:
+        _print_projection(new_logs, args.price_in, args.price_out)
 
 
 if __name__ == "__main__":
