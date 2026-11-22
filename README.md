@@ -28,7 +28,7 @@ triage/score.py             objective scoring rules
 triage/run.py               runs case x variant x config, resumable, writes logs.jsonl and scores.jsonl
 triage/report.py            per-config tables and plots from a run folder
 notebooks/agentic_triage.ipynb   the whole pipeline; runs in Colab or locally
-docs/adr/                   design decisions;  docs/related-work.md  the three papers
+docs/adr/                   design decisions;  docs/related-work.md  related work
 GLOSSARY.md                 project terms
 tests/                      fixture integrity, scorer, adapters, CLI and report tests
 ```
