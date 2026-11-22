@@ -255,14 +255,27 @@ def _alert_message(view: dict) -> str:
     return "ALERT:\n" + json.dumps(view["alert"], indent=2) + f"\nFamily: {view['family']}"
 
 
+def tools_for(config: str) -> list | None:
+    """Tool definitions a config sends: none for A, identical for B and C (ADR 0001)."""
+    return None if config == "A" else [{"name": n, **TOOL_SPECS[n]} for n in sorted(ALLOWED_TOOLS)]
+
+
+def prompt_fingerprint(config: str) -> str:
+    """SHA-256 of exactly what a config is told: system prompt plus tool definitions.
+
+    Logged with every run, and resume reruns any run whose fingerprint differs,
+    so results from older prompts or tools are never mixed with current ones.
+    """
+    return hashlib.sha256(json.dumps({"system": PROMPTS[config], "tools": tools_for(config)},
+                                     sort_keys=True).encode()).hexdigest()
+
+
 def run_case(case: dict, variant: str, config: str, model: Model, view: dict) -> dict:
     if config not in PROMPTS:
         raise ValueError(f"unknown config {config}")
-    tools = None if config == "A" else [{"name": n, **TOOL_SPECS[n]} for n in sorted(ALLOWED_TOOLS)]
+    tools = tools_for(config)
     messages = [{"role": "user", "content": _alert_message(view)}]
-    # Fingerprint of exactly what the model was told, to prove prompts and tools stayed frozen.
-    prompt_sha256 = hashlib.sha256(json.dumps({"system": PROMPTS[config], "tools": tools},
-                                              sort_keys=True).encode()).hexdigest()
+    prompt_sha256 = prompt_fingerprint(config)  # proves which prompts and tools this run used
     log = {
         "case_id": case["case_id"], "family": case["family"], "variant": variant, "config": config,
         "model": model.name, "tool_calls": [], "output_raw": None, "output": None,
