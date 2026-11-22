@@ -5,3 +5,6 @@ __pycache__/
 runs/*
 !runs/.gitkeep
 .pytest_cache/
+desktop.ini
+Thumbs.db
+.DS_Store
