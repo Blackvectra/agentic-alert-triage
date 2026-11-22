@@ -228,13 +228,25 @@ class OllamaModel:
         return f"ollama:{self.model_id}"
 
     @property
+    def think(self):
+        # ADR 0004: qwen3 models think by default, which adds hidden reasoning that
+        # slows every run and can overflow num_ctx. Turn it off; send nothing for
+        # models without a thinking mode, so their requests stay as they were.
+        return False if self.model_id.startswith("qwen3") else None
+
+    @property
     def settings(self) -> dict:
-        return {"model_id": self.model_id, "temperature": self.temperature, "seed": self.seed, "num_ctx": self.num_ctx}
+        s = {"model_id": self.model_id, "temperature": self.temperature, "seed": self.seed, "num_ctx": self.num_ctx}
+        if self.think is not None:
+            s["think"] = self.think
+        return s
 
     def step(self, system, messages, tools):
         payload = {"model": self.model_id, "stream": False,
                    "options": {"temperature": self.temperature, "seed": self.seed, "num_ctx": self.num_ctx},
                    "messages": [{"role": "system", "content": system}] + self._provider_messages(messages)}
+        if self.think is not None:
+            payload["think"] = self.think
         if tools:
             # Same definitions for B and C (ADR 0001), in Ollama's function format.
             payload["tools"] = [{"type": "function", "function": {
