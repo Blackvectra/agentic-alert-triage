@@ -34,8 +34,17 @@ def demo_model() -> ScriptedModel:
                                  Final(json.dumps(answer))], name="scripted-demo")
 
 
+def check_model_name(name: str) -> None:
+    """Fail fast on a malformed model name (e.g. a typo in the notebook's settings cell)."""
+    ok = name == "scripted-demo" or any(
+        name.startswith(prefix) and len(name) > len(prefix) for prefix in ("ollama:", "anthropic:"))
+    if not ok:
+        raise SystemExit(f"unknown model '{name}': use scripted-demo, ollama:<tag> or anthropic:<model-id>")
+
+
 def get_model(name: str, host: str = "http://localhost:11434"):
     """Return a factory that makes a fresh model per run (adapters keep per-run state)."""
+    check_model_name(name)
     if name == "scripted-demo":
         return demo_model
     if name.startswith("ollama:"):
