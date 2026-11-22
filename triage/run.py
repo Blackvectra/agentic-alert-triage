@@ -14,7 +14,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .agent import Final, OllamaModel, ScriptedModel, ToolCall, prompt_fingerprint, run_case
+from .agent import Final, is_harness_error, OllamaModel, ScriptedModel, ToolCall, prompt_fingerprint, run_case
 from .fixtures import ROOT, VARIANTS, build_view, load_cases
 from .jsonl import read_jsonl
 from .score import score_run
@@ -60,11 +60,6 @@ def get_model(name: str, host: str = "http://localhost:11434"):
     raise SystemExit(f"unknown model '{name}': use scripted-demo, ollama:<tag> or anthropic:<model-id>")
 
 
-# A harness failure (exception, timeout, dropped server) is retried on resume.
-# Running out of tool calls is the model's own behaviour and stays as a result.
-MODEL_OUTCOME_ERRORS = {"budget_exhausted_without_answer"}
-
-
 def _key(row: dict) -> tuple:
     return (row["case_id"], row["variant"], row["config"])
 
@@ -81,7 +76,7 @@ def _prepare_resume(out_dir: Path) -> set:
     # Done = scored, no harness error, and made with the current prompts and tools.
     current = {cfg: prompt_fingerprint(cfg) for cfg in CONFIGS}
     done = {_key(l) for l in logs
-            if _key(l) in scored and (l["error"] is None or l["error"] in MODEL_OUTCOME_ERRORS)
+            if _key(l) in scored and not is_harness_error(l["error"])
             and l.get("prompt_sha256") == current.get(l["config"])}
 
     def keep(rows):
@@ -174,6 +169,9 @@ def main(argv=None) -> None:
 
     total = len(cases) * RUNS_PER_CASE
     print(f"{len(new_logs)} new runs, {total - len(new_logs)} already done -> {out_dir}")
+    failed = sum(is_harness_error(l["error"]) for l in new_logs)
+    if failed:
+        print(f"WARNING: {failed} harness errors; rerun the same --out to retry")
     if args.dry_run and new_logs:
         _print_projection(new_logs, args.price_in, args.price_out, len(load_cases("heldout")))
 

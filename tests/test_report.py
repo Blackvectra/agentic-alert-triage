@@ -172,3 +172,10 @@ def test_recommendation_metrics_per_config():
     assert s.loc["B", "unsupported_recommendation_rate"] == pytest.approx(0.5)   # 1 of 2
     assert s.loc["B", "runs_with_unsupported_recommendation"] == 1
     assert s.loc["C", "unsupported_recommendation_rate"] == pytest.approx(0.0)
+
+
+def test_harness_errors_are_counted_apart_from_the_models_own_outcomes():
+    rows = [row(config="C", error="HTTPError: HTTP Error 500", output_valid=False),   # server crash
+            row(config="C", error="budget_exhausted_without_answer", output_valid=False),  # model's result
+            row(config="C")]
+    assert report.summarize(rows).loc["C", "harness_errors"] == 1

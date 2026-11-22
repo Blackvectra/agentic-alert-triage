@@ -99,6 +99,16 @@ class Model(Protocol):
     def step(self, system: str, messages: list, tools: list | None) -> tuple[ToolCall | Final, Usage]: ...
 
 
+# A harness failure (exception, timeout, dropped server) is not the model's answer:
+# resume retries it and the report counts it as a harness error. Running out of
+# tool calls is the model's own behaviour and stays as a result.
+MODEL_OUTCOME_ERRORS = {"budget_exhausted_without_answer"}
+
+
+def is_harness_error(error) -> bool:
+    return error is not None and error not in MODEL_OUTCOME_ERRORS
+
+
 @dataclass
 class ScriptedModel:
     """Deterministic fake model for tests and harness checks. No API calls."""

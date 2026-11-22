@@ -145,3 +145,15 @@ def test_model_name_typo_fails_fast_with_the_valid_forms():
     assert "ollama:<tag>" in str(err.value)
     with pytest.raises(SystemExit):
         run.check_model_name("ollama:")            # prefix with no model tag
+
+
+def test_run_warns_when_harness_errors_remain(tmp_path, capsys, monkeypatch):
+    original = run.demo_model
+
+    def broken():
+        m = original()
+        m.script = []   # nothing scripted: the adapter raises, like a dropped server
+        return m
+    monkeypatch.setattr(run, "demo_model", broken)
+    run.main(["--dry-run", "--out", str(tmp_path / "x")])
+    assert "9 harness errors; rerun the same --out to retry" in capsys.readouterr().out
