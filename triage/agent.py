@@ -157,6 +157,44 @@ class AnthropicModel:
         return Final(text), usage
 
 
+def _http_post_json(url: str, payload: dict) -> dict:
+    """POST JSON with the standard library only (no extra dependency)."""
+    import urllib.request
+
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=600) as resp:
+        return json.loads(resp.read())
+
+
+@dataclass
+class OllamaModel:
+    """Free local open-weight model served by Ollama (e.g. on a Colab GPU). No API key.
+
+    The HTTP call is passed in (`post`) so tests can use a fake server.
+    """
+
+    model_id: str
+    host: str = "http://localhost:11434"
+    post: object = _http_post_json
+
+    @property
+    def name(self) -> str:
+        return f"ollama:{self.model_id}"
+
+    def step(self, system, messages, tools):
+        payload = {"model": self.model_id, "stream": False,
+                   "messages": [{"role": "system", "content": system}] + messages}
+        reply = self.post(f"{self.host}/api/chat", payload)
+        message = reply["message"]
+        usage = Usage(reply.get("prompt_eval_count", 0), reply.get("eval_count", 0))
+        calls = message.get("tool_calls") or []
+        if calls:
+            fn = calls[0]["function"]
+            return ToolCall(fn["name"], fn["arguments"]), usage
+        return Final(message.get("content", "")), usage
+
+
 def _alert_message(view: dict) -> str:
     return "ALERT:\n" + json.dumps(view["alert"], indent=2) + f"\nFamily: {view['family']}"
 
