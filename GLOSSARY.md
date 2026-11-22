@@ -52,7 +52,7 @@ One synthetic alert, all of its evidence, and an expected answer for each varian
 _Avoid_: scenario, test, sample
 
 **Alert family**:
-The category a case belongs to: suspicious_auth, suspicious_process, or privilege_change.
+The category a case belongs to: suspicious_auth, suspicious_process, or account_priv_change.
 _Avoid_: alert type, category
 
 **Variant**:
