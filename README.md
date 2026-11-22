@@ -35,7 +35,7 @@ tests/                      fixture integrity, scorer, adapters, CLI and report 
 
 ## Run it (free)
 
-**Colab (recommended):** open `notebooks/01_walkthrough.ipynb` in Colab, set `MODEL` and `RUN` in the first code cell, and Run all. For a real model choose Runtime → Change runtime type → T4 GPU. Nothing costs money and no API key is used.
+**Colab (recommended):** upload `notebooks/01_walkthrough.ipynb` to Colab and, when asked, the project zip (`git archive --prefix=agentic-alert-triage/ -o agentic-alert-triage.zip HEAD`); no GitHub needed. Then set `MODEL` and `RUN` in the first code cell, and Run all. For a real model choose Runtime → Change runtime type → T4 GPU. Nothing costs money and no API key is used.
 
 **Locally:**
 
