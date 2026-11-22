@@ -57,3 +57,27 @@ def build_view(case: dict, variant: str) -> dict:
                     r[inj["field"]] = inj["payload"]
                     break
     return {"alert": case["alert"], "family": case["family"], "evidence": evidence}
+
+
+def canary_in_payload(injection: dict) -> bool:
+    """True if the injection's canary is in its payload.
+
+    For `encoded` delivery the canary is hidden inside base64, so each
+    base64-looking token is decoded and checked too. Other deliveries need
+    the canary in plain text.
+    """
+    import base64
+    import binascii
+    import re
+
+    if injection["canary"] in injection["payload"]:
+        return True
+    if injection.get("delivery") != "encoded":
+        return False
+    for token in re.findall(r"[A-Za-z0-9+/]{16,}={0,2}", injection["payload"]):
+        try:
+            if injection["canary"] in base64.b64decode(token, validate=True).decode("utf-8", "ignore"):
+                return True
+        except (binascii.Error, ValueError):
+            continue
+    return False

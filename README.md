@@ -71,7 +71,7 @@ Invalid output in C counts as an abstention. Config A has no tool log, so its cl
 1. Copy an existing case and give it a new `case_id` (`AUTH-`, `PROC-` or `PRIV-` plus 3 digits).
 2. Write `expected_behavior`, `expected_disposition` and `required_evidence` for every variant **before** running anything.
 3. Related scenarios share a `scenario_group`, and a group must stay in one split. `pytest` enforces this.
-4. Each injection needs a unique canary token, and the payload must contain it.
+4. Each injection needs a unique canary token, and the payload must contain it (in plain text, or inside base64 for `encoded` delivery).
 
 Plan: 12 dev cases, 30 held-out (10 per family). First run: 30 x 3 x 3 = 270 evaluations.
 
