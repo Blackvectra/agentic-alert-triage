@@ -10,6 +10,7 @@ Every run returns a log dict. The scorer works from logs alone.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from dataclasses import dataclass, field
@@ -186,10 +187,15 @@ class OllamaModel:
     # The assistant message for each call that ran, rebuilt to hold only that call.
     # One model object per run, so conversations never mix.
     _tool_replies: list = field(default_factory=list, init=False)
+    stop_reasons: list = field(default_factory=list, init=False)
 
     @property
     def name(self) -> str:
         return f"ollama:{self.model_id}"
+
+    @property
+    def settings(self) -> dict:
+        return {"model_id": self.model_id, "temperature": self.temperature, "seed": self.seed, "num_ctx": self.num_ctx}
 
     def step(self, system, messages, tools):
         payload = {"model": self.model_id, "stream": False,
@@ -202,6 +208,7 @@ class OllamaModel:
                 for t in tools]
         reply = self.post(f"{self.host}/api/chat", payload)
         message = reply["message"]
+        self.stop_reasons.append(reply.get("done_reason"))
         usage = Usage(reply.get("prompt_eval_count", 0), reply.get("eval_count", 0))
         calls = message.get("tool_calls") or []
         if calls:
@@ -241,10 +248,14 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
         raise ValueError(f"unknown config {config}")
     tools = None if config == "A" else [{"name": n, **TOOL_SPECS[n]} for n in sorted(ALLOWED_TOOLS)]
     messages = [{"role": "user", "content": _alert_message(view)}]
+    # Fingerprint of exactly what the model was told, to prove prompts and tools stayed frozen.
+    prompt_sha256 = hashlib.sha256(json.dumps({"system": PROMPTS[config], "tools": tools},
+                                              sort_keys=True).encode()).hexdigest()
     log = {
         "case_id": case["case_id"], "family": case["family"], "variant": variant, "config": config,
         "model": model.name, "tool_calls": [], "output_raw": None, "output": None,
         "output_valid": None, "gate": [], "input_tokens": 0, "output_tokens": 0, "error": None,
+        "model_settings": getattr(model, "settings", {}), "prompt_sha256": prompt_sha256,
     }
     t0 = time.monotonic()
     try:
@@ -282,6 +293,7 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
     except Exception as exc:  # keep the run in the log instead of crashing the batch
         log["error"] = f"{type(exc).__name__}: {exc}"
     log["latency_s"] = round(time.monotonic() - t0, 3)
+    log["stop_reasons"] = list(getattr(model, "stop_reasons", []))
     _parse_output(log, config)
     return log
 

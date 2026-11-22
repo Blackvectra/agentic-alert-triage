@@ -125,3 +125,18 @@ def test_arguments_sent_as_a_json_string_are_decoded():
     # Some models return arguments as a JSON string rather than an object.
     act, _ = model(FakePost([tool_reply(("event_search", '{"user": "a"}'))])).step("sys", USER_MSG, None)
     assert act == ToolCall("event_search", {"user": "a"})
+
+
+def test_log_records_settings_prompt_hash_and_stop_reasons():
+    case, view = auth_001()
+    logs = {}
+    for config in ("B", "C"):
+        post = FakePost([tool_reply(("event_search", {"user": "jdoe@example.org"})), text_reply(ANSWER)])
+        logs[config] = run_case(case, "complete", config, model(post), view)
+
+    log = logs["C"]
+    assert log["model_settings"] == {"model_id": "qwen2.5:7b", "temperature": 0, "seed": 672, "num_ctx": 16384}
+    assert log["stop_reasons"] == ["stop", "stop"]
+    # The hash proves which prompt and tools a run used; B and C prompts differ by design.
+    assert len(log["prompt_sha256"]) == 64
+    assert logs["B"]["prompt_sha256"] != logs["C"]["prompt_sha256"]
