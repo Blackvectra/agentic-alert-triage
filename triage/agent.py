@@ -120,10 +120,15 @@ class AnthropicModel:
     # with the id of the call it answers. One model object per run, so this
     # never mixes conversations.
     _tool_replies: list = field(default_factory=list, init=False)
+    stop_reasons: list = field(default_factory=list, init=False)
 
     @property
     def name(self) -> str:
         return self.model_id
+
+    @property
+    def settings(self) -> dict:
+        return {"model_id": self.model_id, "effort": self.effort, "max_tokens": self.max_tokens}
 
     def _provider_messages(self, messages):
         out, k = [], 0
@@ -149,6 +154,12 @@ class AnthropicModel:
             request["tools"] = tools
             request["tool_choice"] = {"type": "auto", "disable_parallel_tool_use": True}
         response = self.client.messages.create(**request)
+        reason = response.stop_reason
+        if reason == "refusal":
+            # ADR 0003: record the category; never reroute to another model.
+            details = getattr(response, "stop_details", None)
+            reason = f"refusal:{getattr(details, 'category', None)}"
+        self.stop_reasons.append(reason)
         usage = Usage(response.usage.input_tokens, response.usage.output_tokens)
         for block in response.content:
             if block.type == "tool_use":

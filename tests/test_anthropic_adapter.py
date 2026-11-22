@@ -97,3 +97,19 @@ def test_prompt_only_request_sends_no_tools():
 
     assert "tools" not in client.requests[0]
     assert "tool_choice" not in client.requests[0]
+
+
+def test_refusal_is_recorded_and_yields_no_answer():
+    """ADR 0003: a refusal is logged with its category; no fallback model is used."""
+    refusal = SimpleNamespace(content=[], stop_reason="refusal",
+                              stop_details=SimpleNamespace(category="cyber"),
+                              usage=SimpleNamespace(input_tokens=10, output_tokens=0))
+    client = FakeClient([refusal])
+    model = AnthropicModel(client=client, model_id="claude-sonnet-5-5")
+
+    act, _ = model.step("system prompt", [{"role": "user", "content": "ALERT: ..."}], None)
+
+    assert act == Final("")  # no usable output: invalid, so an abstention in C
+    assert model.stop_reasons == ["refusal:cyber"]
+    assert "fallbacks" not in client.requests[0]
+    assert model.settings == {"model_id": "claude-sonnet-5-5", "effort": "medium", "max_tokens": 16000}
