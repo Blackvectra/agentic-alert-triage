@@ -1,0 +1,3 @@
+# Runs are non-deterministic; we fix model, effort and max_tokens instead of temperature
+
+The current Anthropic API rejects `temperature`, `top_p` and `top_k` on every model, so a run cannot be made deterministic. Every run instead uses one fixed model ID (`claude-sonnet-5-5`), `output_config.effort = "medium"`, `max_tokens = 16000` and one tool call per model turn (`disable_parallel_tool_use`, identical for B and C), and each log line records these settings, the SDK version, a hash of the prompt and tool definitions, and the provider request IDs. Identical inputs can still produce different answers; the report states this, and whether to repeat the 270-run pass is decided after the dry run prices it.
