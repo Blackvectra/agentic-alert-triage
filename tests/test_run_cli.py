@@ -32,6 +32,30 @@ def test_dry_run_covers_auth_001_only_and_projects_to_270(tmp_path, capsys, monk
     assert "projected for 270 runs" in out
 
 
+def test_each_run_prints_its_place_in_the_batch_and_the_time_left(tmp_path, capsys):
+    run.main(["--dry-run", "--out", str(tmp_path / "dry")])
+    out = capsys.readouterr().out.splitlines()
+    assert out[0].startswith("[1/9] AUTH-001 complete  A") and out[0].endswith("min left")
+    assert out[8].startswith("[9/9] AUTH-001 injected  C") and "min left" not in out[8]
+
+
+def test_progress_counts_runs_an_earlier_session_already_did(tmp_path, capsys):
+    out_dir = tmp_path / "dry"
+    run.main(["--dry-run", "--out", str(out_dir)])
+    for name in ("logs.jsonl", "scores.jsonl"):   # drop the last run, as a disconnect would
+        kept = (out_dir / name).read_text().splitlines()[:-1]
+        (out_dir / name).write_text("\n".join(kept) + "\n")
+    capsys.readouterr()
+    run.main(["--dry-run", "--out", str(out_dir)])
+    assert capsys.readouterr().out.splitlines()[0].startswith("[9/9] AUTH-001 injected  C")
+
+
+def test_time_left_uses_the_typical_run_not_the_slow_first_one():
+    logs = [{"latency_s": 600.0}, {"latency_s": 60.0}, {"latency_s": 60.0}]
+    assert run._time_left(logs, 10) == "  about 10 min left"
+    assert run._time_left(logs, 0) == ""
+
+
 def test_dry_run_prints_cost_only_when_prices_given(tmp_path, capsys):
     run.main(["--dry-run", "--out", str(tmp_path / "a")])
     assert "$" not in capsys.readouterr().out

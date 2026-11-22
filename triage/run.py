@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import statistics
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -62,6 +63,15 @@ def get_model(name: str, host: str = "http://localhost:11434"):
 
 def _key(row: dict) -> tuple:
     return (row["case_id"], row["variant"], row["config"])
+
+
+def _time_left(new_logs: list, remaining: int) -> str:
+    """A rough "about N min left" for the progress line; empty after the last run."""
+    if not remaining:
+        return ""
+    # The middle run time, not the average: the first run also loads the model and is much slower.
+    typical = statistics.median(l["latency_s"] for l in new_logs)
+    return f"  about {max(1, round(typical * remaining / 60))} min left"
 
 
 def _prepare_resume(out_dir: Path) -> set:
@@ -152,22 +162,26 @@ def main(argv=None) -> None:
 
     done = _prepare_resume(out_dir)
     new_logs = []
+    total = len(cases) * RUNS_PER_CASE
+    finished = 0  # runs finished so far, counting ones skipped because an earlier session did them
     with open(out_dir / "logs.jsonl", "a") as logs, open(out_dir / "scores.jsonl", "a") as scores:
         for case in cases:
             for variant in VARIANTS:
                 view = build_view(case, variant)
                 for config in CONFIGS:
                     if (case["case_id"], variant, config) in done:
+                        finished += 1
                         continue
                     log = run_case(case, variant, config, make_model(), view)  # fresh model per run
                     logs.write(json.dumps(log) + "\n")
                     scores.write(json.dumps(score_run(log, case)) + "\n")
                     logs.flush(), scores.flush()  # survive a disconnect mid-batch
                     new_logs.append(log)
-                    print(f"{case['case_id']} {variant:9} {config}  {log['latency_s']:6.1f}s  "
-                          f"error={log['error']}", flush=True)
+                    finished += 1
+                    print(f"[{finished:{len(str(total))}}/{total}] {case['case_id']} {variant:9} {config}  "
+                          f"{log['latency_s']:6.1f}s  error={log['error']}"
+                          f"{_time_left(new_logs, total - finished)}", flush=True)
 
-    total = len(cases) * RUNS_PER_CASE
     print(f"{len(new_logs)} new runs, {total - len(new_logs)} already done -> {out_dir}")
     failed = sum(is_harness_error(l["error"]) for l in new_logs)
     if failed:
