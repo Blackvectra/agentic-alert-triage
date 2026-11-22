@@ -7,7 +7,10 @@ dependencies = ["jsonschema>=4.23"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3"]
-notebook = ["jupyterlab>=4.2", "pandas>=2.2"]
+notebook = ["jupyterlab>=4.2", "pandas>=2.2", "matplotlib>=3.8"]
+report = ["pandas>=2.2", "matplotlib>=3.8"]
+# Optional paid model; the experiment itself uses a free local model via Ollama (ADR 0004).
+anthropic = ["anthropic>=2.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
