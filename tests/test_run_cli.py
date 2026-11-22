@@ -92,3 +92,30 @@ def test_resume_keeps_a_model_that_ran_out_of_budget(tmp_path):
 
     assert lines(out / "logs.jsonl")[0]["error"] == "budget_exhausted_without_answer"
     assert len(lines(out / "logs.jsonl")) == 9
+
+
+def test_projection_uses_the_planned_30_cases_when_none_are_written_yet(tmp_path, capsys):
+    run.main(["--dry-run", "--out", str(tmp_path / "p")])
+    out = capsys.readouterr().out
+    assert "projected for 270 runs (planned 30 held-out cases; none written yet)" in out
+
+
+def test_projection_counts_the_held_out_cases_that_exist(tmp_path, capsys, monkeypatch):
+    import copy
+    real = run.load_cases()
+    held = []
+    for i in (1, 2):
+        c = copy.deepcopy(real[0])
+        c["case_id"], c["split"] = f"AUTH-90{i}", "heldout"
+        held.append(c)
+    monkeypatch.setattr(run, "load_cases",
+                        lambda split=None, family=None: [c for c in real + held if split in (None, c["split"])])
+
+    run.main(["--dry-run", "--out", str(tmp_path / "h")])
+
+    assert "projected for 18 runs (2 held-out cases)" in capsys.readouterr().out
+
+
+def test_dry_run_says_split_and_family_are_ignored(tmp_path, capsys):
+    run.main(["--dry-run", "--split", "heldout", "--family", "suspicious_auth", "--out", str(tmp_path / "w")])
+    assert "--dry-run always uses AUTH-001; ignoring --split/--family" in capsys.readouterr().out

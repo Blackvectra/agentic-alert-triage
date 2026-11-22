@@ -20,7 +20,8 @@ from .jsonl import read_jsonl
 from .score import score_run
 
 CONFIGS = ("A", "B", "C")
-HELDOUT_RUNS = 30 * len(VARIANTS) * len(CONFIGS)  # the planned held-out pass: 270
+PLANNED_HELDOUT_CASES = 30  # the proposal's held-out set: 30 x 3 variants x 3 configs = 270 runs
+RUNS_PER_CASE = len(VARIANTS) * len(CONFIGS)
 DRY_RUN_CASE = "AUTH-001"
 
 
@@ -85,7 +86,8 @@ def _prepare_resume(out_dir: Path) -> set:
     return done
 
 
-def _print_projection(logs: list[dict], price_in: float | None, price_out: float | None) -> None:
+def _print_projection(logs: list[dict], price_in: float | None, price_out: float | None,
+                      heldout_cases: int) -> None:
     n = len(logs)
     print(f"\n{'config':6} {'runs':>4} {'in tok/run':>11} {'out tok/run':>12} {'sec/run':>8} {'steps/run':>10}")
     for cfg in CONFIGS:
@@ -96,11 +98,16 @@ def _print_projection(logs: list[dict], price_in: float | None, price_out: float
         print(f"{cfg:6} {k:>4} {sum(l['input_tokens'] for l in rs) / k:>11.0f} "
               f"{sum(l['output_tokens'] for l in rs) / k:>12.0f} {sum(l['latency_s'] for l in rs) / k:>8.1f} "
               f"{sum(len(l.get('stop_reasons', [])) for l in rs) / k:>10.1f}")
-    scale = HELDOUT_RUNS / n
+    if heldout_cases:
+        cases, label = heldout_cases, f"{heldout_cases} held-out cases"
+    else:
+        cases, label = PLANNED_HELDOUT_CASES, f"planned {PLANNED_HELDOUT_CASES} held-out cases; none written yet"
+    target = cases * RUNS_PER_CASE
+    scale = target / n
     tin = sum(l["input_tokens"] for l in logs) * scale
     tout = sum(l["output_tokens"] for l in logs) * scale
     hours = sum(l["latency_s"] for l in logs) * scale / 3600
-    print(f"\nprojected for {HELDOUT_RUNS} runs: {tin:,.0f} input tokens, {tout:,.0f} output tokens, "
+    print(f"\nprojected for {target} runs ({label}): {tin:,.0f} input tokens, {tout:,.0f} output tokens, "
           f"~{hours:.1f} hours of model time")
     if price_in is not None and price_out is not None:
         print(f"projected cost: ${(tin * price_in + tout * price_out) / 1e6:,.2f} "
@@ -110,12 +117,12 @@ def _print_projection(logs: list[dict], price_in: float | None, price_out: float
 
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--split", choices=["dev", "heldout"], default="dev")
+    ap.add_argument("--split", choices=["dev", "heldout"], help="default: dev")
     ap.add_argument("--family")
     ap.add_argument("--model", default="scripted-demo", help="scripted-demo | ollama:<tag> | anthropic:<model-id>")
     ap.add_argument("--host", default="http://localhost:11434", help="Ollama server URL")
     ap.add_argument("--out", help="output directory; reuse it to resume an interrupted run")
-    ap.add_argument("--dry-run", action="store_true", help=f"run {DRY_RUN_CASE} only and project to {HELDOUT_RUNS} runs")
+    ap.add_argument("--dry-run", action="store_true", help=f"run {DRY_RUN_CASE} only and project to the held-out pass")
     ap.add_argument("--price-in", type=float, help="USD per million input tokens (paid models only)")
     ap.add_argument("--price-out", type=float, help="USD per million output tokens (paid models only)")
     args = ap.parse_args(argv)
@@ -125,14 +132,16 @@ def main(argv=None) -> None:
         out_dir = Path(args.out)
     else:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        label = "dryrun" if args.dry_run else args.split
+        label = "dryrun" if args.dry_run else (args.split or "dev")
         out_dir = ROOT / "runs" / f"{stamp}_{label}_{args.model.replace(':', '-')}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if args.dry_run:
+        if args.split or args.family:
+            print(f"--dry-run always uses {DRY_RUN_CASE}; ignoring --split/--family")
         cases = [c for c in load_cases() if c["case_id"] == DRY_RUN_CASE]
     else:
-        cases = load_cases(args.split, args.family)
+        cases = load_cases(args.split or "dev", args.family)
 
     done = _prepare_resume(out_dir)
     new_logs = []
@@ -151,10 +160,10 @@ def main(argv=None) -> None:
                     print(f"{case['case_id']} {variant:9} {config}  {log['latency_s']:6.1f}s  "
                           f"error={log['error']}", flush=True)
 
-    total = len(cases) * len(VARIANTS) * len(CONFIGS)
+    total = len(cases) * RUNS_PER_CASE
     print(f"{len(new_logs)} new runs, {total - len(new_logs)} already done -> {out_dir}")
     if args.dry_run and new_logs:
-        _print_projection(new_logs, args.price_in, args.price_out)
+        _print_projection(new_logs, args.price_in, args.price_out, len(load_cases("heldout")))
 
 
 if __name__ == "__main__":
