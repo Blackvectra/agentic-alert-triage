@@ -8,7 +8,7 @@ from pathlib import Path
 import nbformat
 from nbclient import NotebookClient
 
-NOTEBOOK = Path(__file__).resolve().parent.parent / "notebooks" / "01_walkthrough.ipynb"
+NOTEBOOK = Path(__file__).resolve().parent.parent / "notebooks" / "agentic_triage.ipynb"
 
 
 def test_walkthrough_notebook_runs_without_errors():

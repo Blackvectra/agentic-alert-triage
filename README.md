@@ -27,15 +27,15 @@ triage/agent.py             configs A/B/C, agent loop, ScriptedModel, OllamaMode
 triage/score.py             objective scoring rules
 triage/run.py               runs case x variant x config, resumable, writes logs.jsonl and scores.jsonl
 triage/report.py            per-config tables and plots from a run folder
-notebooks/01_walkthrough.ipynb  the whole pipeline; runs in Colab or locally
+notebooks/agentic_triage.ipynb   the whole pipeline; runs in Colab or locally
 docs/adr/                   design decisions;  docs/related-work.md  the three papers
 GLOSSARY.md                 project terms
 tests/                      fixture integrity, scorer, adapters, CLI and report tests
 ```
 
-## Run it (free)
+## Run it
 
-**Colab (recommended):** upload `notebooks/01_walkthrough.ipynb` to Colab and, when asked, the project zip, built and verified with `python scripts/make_colab_zip.py` (writes `dist/agentic-alert-triage.zip`); no GitHub needed. Then set `MODEL` and `RUN` in the first code cell, and Run all. For a real model choose Runtime → Change runtime type → T4 GPU. Nothing costs money and no API key is used.
+**Colab (recommended):** upload `notebooks/agentic_triage.ipynb` to Colab and, when asked, the project zip, built and verified with `python scripts/make_colab_zip.py` (writes `dist/agentic-alert-triage.zip`); no GitHub needed. Then set `MODEL` and `RUN` in the first code cell, and Run all. For the real model (qwen3:32b) choose Runtime → Change runtime type → A100 GPU, which needs Colab Pro. No API key is used.
 
 **Locally:**
 
