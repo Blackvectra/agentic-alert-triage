@@ -91,7 +91,7 @@ def test_invalid_output_counts_as_abstain_in_C():
 
 
 def test_gate_never_executes():
-    act = {"action": "disable_account", "target": USER}
+    act = {"action": "disable_account", "target": USER, "evidence_ids": ["E-EVT-003"]}  # ADR 0006 format
     log, _ = run("complete", "C", [answer(actions=[act])])
     assert log["gate"] and all(g["executed"] is False for g in log["gate"])
 
@@ -153,3 +153,14 @@ def test_any_recommendation_is_unsupported_on_a_benign_case():
 def test_no_recommendations_scores_zero():
     _, s = run("complete", "C", [SEARCH, answer()])
     assert (s["n_recommendations"], s["unsupported_recommendations"]) == (0, 0)
+
+
+def test_output_format_requires_evidence_on_every_recommendation():
+    # C enforces the format (invalid output = abstention); B keeps what it sent (unguarded output).
+    bare = {"action": "disable account"}
+    log_c, _ = run("complete", "C", [SEARCH, answer(actions=[bare])])
+    log_b, _ = run("complete", "B", [SEARCH, answer(actions=[bare])])
+    assert log_c["output_valid"] is False and log_c["output"] is None
+    assert log_b["output_valid"] is False and log_b["output"]["proposed_actions"] == [bare]
+    from triage.agent import BASE_PROMPT
+    assert '"proposed_actions": [{"action": str, "evidence_ids": [str]}]' in BASE_PROMPT
