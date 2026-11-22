@@ -120,6 +120,9 @@ class AnthropicModel:
         response = self.client.messages.create(
             model=self.model_id, system=system, messages=messages, max_tokens=16000,
         )
+        for block in response.content:
+            if block.type == "tool_use":
+                return ToolCall(block.name, block.input), Usage()
         text = "".join(b.text for b in response.content if b.type == "text")
         return Final(text), Usage()
 
