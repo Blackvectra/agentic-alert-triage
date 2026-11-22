@@ -32,3 +32,7 @@ Who wrote each finalized case and its expected answers, for the report's method 
 | PROC-104 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
 | PROC-105 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
 | PROC-106 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
+| PROC-107 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
+| PROC-108 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
+| PROC-109 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
+| PROC-110 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
