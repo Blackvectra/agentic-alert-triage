@@ -13,7 +13,8 @@ import re
 # call runs; Config B passes arguments through unchecked.
 TOOL_SPECS = {
     "event_search": {
-        "description": "Search event logs for a user or IP. Returns matching events.",
+        "description": ("Search event logs by user and/or source IP. Returns matching events. "
+                        "event_type is optional: omit it to get every event for that user or IP."),
         "input_schema": {
             "type": "object",
             "properties": {

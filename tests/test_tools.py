@@ -25,3 +25,10 @@ def test_event_type_is_not_guessed():
 
 def test_omitting_event_type_returns_every_event_for_the_user():
     assert ids(event_search(VIEW, user=USER)) == ["E-EVT-001", "E-EVT-002", "E-EVT-003", "E-EVT-004"]
+
+
+def test_description_tells_the_model_event_type_is_optional():
+    # The model can only use what the description tells it (dry run: it always guessed a type).
+    from triage.tools import TOOL_SPECS
+    desc = TOOL_SPECS["event_search"]["description"].lower()
+    assert "optional" in desc and "omit" in desc
