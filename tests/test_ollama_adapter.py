@@ -46,3 +46,35 @@ def test_tool_call_reply_becomes_tool_call():
 def test_step_reports_token_usage():
     _, usage = model(FakePost([text_reply("{}", prompt_tokens=812, output_tokens=47)])).step("sys", USER_MSG, None)
     assert usage == Usage(input_tokens=812, output_tokens=47)
+
+
+TOOL = {"name": "guide_lookup", "description": "Get the guide.",
+        "input_schema": {"type": "object", "properties": {"family": {"type": "string"}}}}
+
+
+def test_request_is_reproducible_and_carries_tools():
+    post = FakePost([text_reply("{}")])
+    model(post).step("sys", USER_MSG, [TOOL])
+
+    url, sent = post.requests[0]
+    assert url == "http://localhost:11434/api/chat"
+    assert sent["model"] == "qwen2.5:7b" and sent["stream"] is False
+    # Local models accept temperature and seed, so runs are repeatable (unlike the Anthropic API).
+    assert sent["options"] == {"temperature": 0, "seed": 672, "num_ctx": 16384}
+    assert sent["messages"][0] == {"role": "system", "content": "sys"}
+    assert sent["tools"] == [{"type": "function", "function": {
+        "name": "guide_lookup", "description": "Get the guide.",
+        "parameters": {"type": "object", "properties": {"family": {"type": "string"}}}}}]
+
+
+def test_prompt_only_request_sends_no_tools():
+    post = FakePost([text_reply("{}")])
+    model(post).step("sys", USER_MSG, None)
+    assert "tools" not in post.requests[0][1]
+
+
+def test_only_the_first_of_several_tool_calls_is_used():
+    # One call per turn, same as the Anthropic adapter, so the budget counts calls one at a time.
+    reply = tool_reply(("event_search", {"user": "a"}), ("entity_lookup", {"id": "a"}))
+    act, _ = model(FakePost([reply])).step("sys", USER_MSG, None)
+    assert act == ToolCall("event_search", {"user": "a"})

@@ -177,6 +177,12 @@ class OllamaModel:
     model_id: str
     host: str = "http://localhost:11434"
     post: object = _http_post_json
+    # ADR 0004: greedy decoding with a fixed seed makes runs repeatable.
+    temperature: float = 0
+    seed: int = 672
+    # Ollama's default context is small and truncates silently; a long tool
+    # conversation must fit or the model loses the alert.
+    num_ctx: int = 16384
 
     @property
     def name(self) -> str:
@@ -184,7 +190,13 @@ class OllamaModel:
 
     def step(self, system, messages, tools):
         payload = {"model": self.model_id, "stream": False,
+                   "options": {"temperature": self.temperature, "seed": self.seed, "num_ctx": self.num_ctx},
                    "messages": [{"role": "system", "content": system}] + messages}
+        if tools:
+            # Same definitions for B and C (ADR 0001), in Ollama's function format.
+            payload["tools"] = [{"type": "function", "function": {
+                "name": t["name"], "description": t["description"], "parameters": t["input_schema"]}}
+                for t in tools]
         reply = self.post(f"{self.host}/api/chat", payload)
         message = reply["message"]
         usage = Usage(reply.get("prompt_eval_count", 0), reply.get("eval_count", 0))
