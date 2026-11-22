@@ -6,7 +6,7 @@ No network, no API key, no cost.
 """
 from types import SimpleNamespace
 
-from triage.agent import AnthropicModel, Final, ToolCall
+from triage.agent import AnthropicModel, Final, ToolCall, Usage
 
 
 class FakeClient:
@@ -56,3 +56,12 @@ def test_tool_use_reply_becomes_tool_call():
     act, _usage = model.step("system prompt", [{"role": "user", "content": "ALERT: ..."}], None)
 
     assert act == ToolCall("event_search", {"user": "jdoe@example.org"})
+
+
+def test_step_reports_token_usage_from_the_response():
+    client = FakeClient([text_response("{}", input_tokens=1234, output_tokens=56)])
+    model = AnthropicModel(client=client, model_id="claude-sonnet-5-5")
+
+    _act, usage = model.step("system prompt", [{"role": "user", "content": "ALERT: ..."}], None)
+
+    assert usage == Usage(input_tokens=1234, output_tokens=56)
