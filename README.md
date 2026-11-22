@@ -19,28 +19,38 @@ Everything is simulated. No tool writes anything, and the approval gate never ex
 ```
 fixtures/case.schema.json   case format (validated on load)
 fixtures/cases/*.json       one file per case: alert, all evidence, 3 variants with expected answers
+fixtures/drafts/            draft cases awaiting expected answers (not loaded)
 triage/fixtures.py          load cases, build the evidence view for a variant
 triage/tools.py             event_search, entity_lookup, guide_lookup (read-only)
 triage/gate.py              mock approval gate, binds approval to exact parameters, never executes
-triage/agent.py             configs A/B/C, agent loop, model interface, ScriptedModel
+triage/agent.py             configs A/B/C, agent loop, ScriptedModel, OllamaModel (free), AnthropicModel (optional)
 triage/score.py             objective scoring rules
-notebooks/01_walkthrough.ipynb  load a case, view the variants, run A/B/C, score and summarize
-triage/run.py               runs case x variant x config, writes runs/<stamp>/logs.jsonl and scores.jsonl
-tests/                      fixture integrity and scorer tests
+triage/run.py               runs case x variant x config, resumable, writes logs.jsonl and scores.jsonl
+triage/report.py            per-config tables and plots from a run folder
+notebooks/01_walkthrough.ipynb  the whole pipeline; runs in Colab or locally
+docs/adr/                   design decisions;  docs/related-work.md  the three papers
+GLOSSARY.md                 project terms
+tests/                      fixture integrity, scorer, adapters, CLI and report tests
 ```
 
-## Setup
+## Run it (free)
+
+**Colab (recommended):** open `notebooks/01_walkthrough.ipynb` in Colab, set `MODEL` and `RUN` in the first code cell, and Run all. For a real model choose Runtime → Change runtime type → T4 GPU. Nothing costs money and no API key is used.
+
+**Locally:**
 
 ```
 python -m venv .venv
 .venv\Scripts\activate            # Windows
-pip install -e ".[dev,notebook]"
+pip install -e ".[dev,report]"     # or: pip install -r requirements.lock && pip install -e . --no-deps
 pytest
-jupyter lab notebooks/01_walkthrough.ipynb
-python -m triage.run --split dev --family suspicious_auth
+python -m triage.run --dry-run                                   # scripted model, no GPU
+python -m triage.run --model ollama:qwen2.5:7b --dry-run         # needs Ollama running locally
+python -m triage.run --model ollama:qwen2.5:7b --split heldout --out runs/heldout   # rerun the same command to resume
+python -m triage.report runs/heldout
 ```
 
-The default model, `scripted-demo`, is a fixed fake. It exercises logging and scoring without an API key.
+Models: `scripted-demo` (fixed fake), `ollama:<tag>` (free local open-weight model, the experiment default, ADR 0004), `anthropic:<model-id>` (optional and paid; needs `pip install -e ".[anthropic]"` and `ANTHROPIC_API_KEY`).
 
 ## Scoring rules (fixed before any run)
 
@@ -67,7 +77,7 @@ Plan: 12 dev cases, 30 held-out (10 per family). First run: 30 x 3 x 3 = 270 eva
 
 ## Still to do
 
-- [ ] Model adapter for the chosen provider in `triage/agent.py` (implement `Model.step`)
-- [ ] Remaining dev cases for suspicious_auth, then the other two families
-- [ ] Aggregate script: per-config tables and plots from `scores.jsonl`
-- [ ] Price the slice on the real model before the 270-run held-out pass
+- [ ] Dry run with the local model in Colab: confirm it calls tools and produces valid JSON, and note the projected time for 270 runs
+- [ ] Finalize drafts AUTH-002..004 (expected answers), then write the remaining dev cases for the other two families
+- [ ] Write the 30 held-out cases (10 per family) with a mix of injection delivery and intent labels
+- [ ] Held-out pass: 30 x 3 x 3 = 270 runs, then `python -m triage.report`
