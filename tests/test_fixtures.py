@@ -98,3 +98,22 @@ def test_required_evidence_is_reachable_with_the_tools():
         for name in VARIANTS:
             missing = set(c["variants"][name]["required_evidence"]) - reachable_ids(build_view(c, name))
             assert not missing, (c["case_id"], name, sorted(missing))
+
+
+def test_summary_leak_finds_withheld_facts_only_the_hidden_record_holds():
+    from triage.fixtures import summary_leaks
+    case = {"alert": {"summary": "jdoe failed for 41 accounts at 02:55Z from Fargo, US."},
+            "evidence": {"events": [
+                {"evidence_id": "E-1", "time": "2026-04-09T02:55:00Z", "accounts_targeted": 41, "geo": "Fargo, US"},
+                {"evidence_id": "E-2", "geo": "Fargo, US", "privileged": False}]},
+            "variants": {"withheld": {"withhold_ids": ["E-1"]}}}
+    # Fargo is also in a visible record, so naming it reveals nothing hidden.
+    assert summary_leaks(case) == {"E-1": ["02:55", "41"]}
+
+
+def test_alert_summaries_do_not_restate_withheld_records():
+    # ADR 0008 rule 2. The four cases approved before it are listed so the exemption stays honest.
+    from triage.fixtures import summary_leaks
+    exempt = {"AUTH-003", "AUTH-004"}
+    leaking = {c["case_id"] for c in CASES if summary_leaks(c)}
+    assert leaking == exempt & {c["case_id"] for c in CASES}, sorted(leaking)
