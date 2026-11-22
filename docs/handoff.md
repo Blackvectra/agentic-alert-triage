@@ -1,10 +1,10 @@
 # Handoff: agentic-alert-triage (EE 672)
 
-Updated 2026-11-22 (before a new session).
+Updated 2026-11-22 (after the lock and CLAUDE.md fixes).
 
 ## Where things stand
-- Repo `blackvectra/agentic-alert-triage`, branch `mlev/beautiful-bardeen-qdvis3`, pushed at `e8f343b`. Nothing is uncommitted.
-- Draft PR [Blackvectra/agentic-alert-triage#19](https://github.com/Blackvectra/agentic-alert-triage/pull/19). CI passed on `e8f343b`. Not merged: merge only by squash, and only when the user asks.
+- Repo `blackvectra/agentic-alert-triage`, branch `mlev/beautiful-bardeen-qdvis3`, last code commit `329dbd8`; this note is the commit after it. Nothing is uncommitted.
+- Draft PR [Blackvectra/agentic-alert-triage#19](https://github.com/Blackvectra/agentic-alert-triage/pull/19). CI last confirmed passing on `e8f343b`; check the PR for the newer commits. Not merged: merge only by squash, and only when the user asks.
 - **Model settled (ADR 0004, ADR 0007 amended):** `ollama:qwen3:32b` with thinking off, on a Colab Pro A100. Every run uses the same GPU type.
   - The model was chosen before any of its results were seen, so the ADR 0007 comparison was not run. The dev run is only a check that the model works.
   - If qwen3:32b fails that check, the user picks a replacement before any held-out run, and the choice is recorded in ADR 0007.
@@ -22,7 +22,12 @@ Updated 2026-11-22 (before a new session).
   - A correct abstention counts as correct. This is needed because `score.py`'s `disposition_correct` is false for any abstention.
   - Harness errors are left out. pandas turns a missing error into NaN, and the chart turns it back to None before calling `is_harness_error`.
   - plotly is in the `report`/`notebook` extras and pinned in `requirements.lock`.
-- The Colab zip `dist/agentic-alert-triage.zip` is built from `e8f343b`. It is not committed. Rebuild it with `python scripts/make_colab_zip.py`.
+  - The counting rule lives in `triage/report.py` and has its own unit test in `tests/test_report.py`.
+- **Lock file:** `requirements.lock` pins everything from `pip install -e ".[dev,report,notebook]"` (104 packages, built on Python 3.13, Linux).
+  - `tests/test_lock.py` fails if a package in the `report` or `notebook` extras has no pin.
+  - CI installs from `pyproject.toml` on Python 3.11, not from the lock, so the lock is only verified by the one install that built it.
+  - To rebuild it, pass the old lock as a constraints file (`-c`) so existing versions don't move.
+- The Colab zip `dist/agentic-alert-triage.zip` is not committed, and the last one was built from `e8f343b`, so it is out of date. Rebuild it with `python scripts/make_colab_zip.py` before the dev run.
 - Fixtures: 12 dev cases and 30 held-out cases (AUTH, PROC and PRIV, each numbered 101..110). Provenance is in `fixtures/PROVENANCE.md`.
 
 ## Next work, in order
@@ -40,8 +45,6 @@ Updated 2026-11-22 (before a new session).
 ## Open decisions (user's call)
 - Replace AUTH-107/108? Their scenario group `auth-impossible-travel-h1` overlaps with dev's impossible-travel scenarios.
 - Tighten the fallback rule if qwen3:32b fails, for example to `qwen3:30b-a3b`.
-- `requirements.lock` has a header that says `.[dev,report]`, but the lock holds no dev packages. Fix the header or regenerate the lock.
-- The notebook test only checks that cells don't raise errors. A unit test of the chart rule would catch wrong values. An empty-chart bug already slipped past it once.
 
 ## Notebook layout checklist (apply to any notebook the user adds)
 The user will add another notebook. It must follow the same layout as `notebooks/agentic_triage.ipynb`, which follows the course's Week 6 lab (`EE672_W6_Code.ipynb`), while serving this project's objectives.
@@ -85,7 +88,8 @@ These come from CLAUDE.md and from the user.
 
 ## Session setup (context)
 - The last session reached 145k/300k tokens. About 46k of that was MCP tools from plugins this project doesn't use.
-- Before this session started, the user planned to remove or turn off these plugins at https://claude.ai/customize/connectors: small-business, quickbooks-labs, searchfit-seo, operations, data and engineering. Run `/context` early to check whether that was done.
+- The user planned to remove or turn off these plugins at https://claude.ai/customize/connectors: small-business, quickbooks-labs, searchfit-seo, operations, data and engineering. They were all still loaded in the 2026-11-22 session.
+- Only the user can run `/context`; the agent can't. Ask the user for the total.
 - This project needs only the GitHub, Google Drive and claude-code-remote connectors.
 - Connectors belong to the whole account, not to a project. A committed `.mcp.json` can add servers to one repository but can't hide account connectors. Changes take effect in the next new session.
 - The other notebook the user mentioned hasn't been uploaded yet. When it arrives, apply the layout checklist above, and ask what it's for (walkthrough or results analysis).
