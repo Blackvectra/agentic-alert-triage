@@ -1,6 +1,7 @@
 # Agentic Alert Triage
 
 Read GLOSSARY.md for project terms and docs/adr/ before changing triage/.
+Run `python scripts/check.py` before committing; CI runs the same check.
 
 - Read-only and simulated: tools never write; the approval gate never executes.
 - Scoring rules (triage/score.py) and each case's expected answers are the user's ground truth: ask before changing them.

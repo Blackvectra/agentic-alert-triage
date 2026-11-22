@@ -43,7 +43,7 @@ tests/                      fixture integrity, scorer, adapters, CLI and report 
 python -m venv .venv
 .venv\Scripts\activate            # Windows
 pip install -e ".[dev,report]"     # or: pip install -r requirements.lock && pip install -e . --no-deps
-pytest
+python scripts/check.py           # fresh venv + every test, same as CI
 python -m triage.run --dry-run                                   # scripted model, no GPU
 python -m triage.run --model ollama:qwen2.5:7b --dry-run         # needs Ollama running locally
 python -m triage.run --model ollama:qwen2.5:7b --split heldout --out runs/heldout   # rerun the same command to resume
