@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = ["jsonschema>=4.23"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3"]
+dev = ["pytest>=8.3", "nbclient>=0.10", "ipykernel>=6.29", "nbformat>=5.10"]
 notebook = ["jupyterlab>=4.2", "pandas>=2.2", "matplotlib>=3.8"]
 report = ["pandas>=2.2", "matplotlib>=3.8"]
 # Optional paid model; the experiment itself uses a free local model via Ollama (ADR 0004).

@@ -35,7 +35,7 @@ tests/                      fixture integrity, scorer, adapters, CLI and report 
 
 ## Run it (free)
 
-**Colab (recommended):** upload `notebooks/01_walkthrough.ipynb` to Colab and, when asked, the project zip (`git archive --prefix=agentic-alert-triage/ -o agentic-alert-triage.zip HEAD`); no GitHub needed. Then set `MODEL` and `RUN` in the first code cell, and Run all. For a real model choose Runtime → Change runtime type → T4 GPU. Nothing costs money and no API key is used.
+**Colab (recommended):** upload `notebooks/01_walkthrough.ipynb` to Colab and, when asked, the project zip, built and verified with `python scripts/make_colab_zip.py` (writes `dist/agentic-alert-triage.zip`); no GitHub needed. Then set `MODEL` and `RUN` in the first code cell, and Run all. For a real model choose Runtime → Change runtime type → T4 GPU. Nothing costs money and no API key is used.
 
 **Locally:**
 
@@ -43,7 +43,7 @@ tests/                      fixture integrity, scorer, adapters, CLI and report 
 python -m venv .venv
 .venv\Scripts\activate            # Windows
 pip install -e ".[dev,report]"     # or: pip install -r requirements.lock && pip install -e . --no-deps
-pytest
+python scripts/check.py           # fresh venv + every test, same as CI
 python -m triage.run --dry-run                                   # scripted model, no GPU
 python -m triage.run --model ollama:qwen2.5:7b --dry-run         # needs Ollama running locally
 python -m triage.run --model ollama:qwen2.5:7b --split heldout --out runs/heldout   # rerun the same command to resume

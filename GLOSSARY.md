@@ -31,6 +31,20 @@ The maximum number of tool calls one run may make; identical for B and C.
 A mock human-approval step that records a proposed action bound to its exact parameters and never executes it.
 _Avoid_: executor, action runner
 
+## Dispositions
+
+**True positive**:
+The evidence shows malicious or unauthorized activity.
+_Avoid_: confirmed, malicious, real alert
+
+**Benign**:
+The alert fired, but the evidence explains the activity as legitimate; absence of attack evidence alone is not enough.
+_Avoid_: false positive, clean, nothing found
+
+**Needs more info**:
+The evidence retrievable through the tools cannot decide between true positive and benign.
+_Avoid_: inconclusive, unknown
+
 ## Cases and evidence
 
 **Case**:
