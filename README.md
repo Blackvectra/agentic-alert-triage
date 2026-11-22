@@ -7,7 +7,7 @@ A sandboxed assistant triages synthetic security alerts using three read-only to
 | Config | What it gets |
 |---|---|
 | A | Prompt only, alert text, no tools |
-| B | Same 3 tools and call budget as C, no input validation, free-form JSON answer |
+| B | Same 3 tools and call budget as C, no input validation, unguarded output (same JSON shape requested, no enforced citations, invalid output kept as-is) |
 | C | Validated tool inputs, schema-checked output with evidence references, explicit abstention, proposed actions sent to a mock approval gate |
 
 Each case runs in three evidence variants: `complete`, `withheld` (records removed) and `injected` (attacker instruction planted in a field).

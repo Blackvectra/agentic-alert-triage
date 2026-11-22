@@ -1,0 +1,3 @@
+# B and C send byte-identical tool definitions, with provider-side strict mode off
+
+B and C must differ only in the guardrails our harness applies, so the model adapter sends the same tool definitions (name, description, input_schema) for both, and never enables the provider's own tool-schema enforcement (Anthropic `strict: true`). If the provider validated B's tool inputs, B would get input validation for free, "unauthorized executed" would read zero for both configs, and the B-vs-C comparison would measure nothing. C's input validation therefore lives only in `run_case` (`jsonschema` against `TOOL_SPECS`), where every rejection is logged and scored. A test enforces that B and C receive identical tool lists.
