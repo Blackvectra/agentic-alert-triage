@@ -98,3 +98,42 @@ def reachable_ids(view: dict) -> set[str]:
             found |= {r["evidence_id"] for r in records}
     found |= {r["evidence_id"] for r in guide_lookup(view, family=view["family"])}
     return found
+
+
+def _facts(record: dict) -> set[str]:
+    """Text a summary could repeat: field values, and HH:MM of timestamps (summaries use 14:52Z)."""
+    import re
+
+    out = set()
+    for key, value in record.items():
+        if key == "evidence_id" or isinstance(value, bool):
+            continue
+        for v in (value if isinstance(value, list) else [value]):
+            text = str(v)
+            out.add(text)
+            if key == "time":
+                out |= set(re.findall(r"T(\d\d:\d\d)", text))
+    return {f for f in out if len(f) >= 2}
+
+
+def summary_leaks(case: dict) -> dict[str, list[str]]:
+    """Withheld records whose facts the alert summary repeats (ADR 0008 rule 2).
+
+    A fact counts only if no visible record also holds it: naming a city the
+    model can still look up reveals nothing that was withheld.
+    """
+    import re
+
+    hidden = set(case["variants"]["withheld"].get("withhold_ids", []))
+    records = [r for kind in case["evidence"].values() for r in kind]
+    visible = set().union(*(_facts(r) for r in records if r["evidence_id"] not in hidden))
+    summary = case["alert"]["summary"]
+    leaks = {}
+    for r in records:
+        if r["evidence_id"] in hidden:
+            # Whole-word match, so "41" does not hit "ALR-10421"; a trailing Z is allowed (02:55Z).
+            found = sorted(f for f in _facts(r) - visible
+                           if re.search(rf"(?<!\w){re.escape(f)}(?![^\WZ])", summary))
+            if found:
+                leaks[r["evidence_id"]] = found
+    return leaks

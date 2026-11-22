@@ -41,3 +41,4 @@ From the approved semester proposal (EE 672, "Trustworthy Agentic AI for Securit
 | Usefulness loss | abstention 2x2 (`abstained_when_could_answer`) |
 | One family end to end first | suspicious_auth AUTH-001..004 |
 | Model choice | ADR 0004, ADR 0007 |
+| Appropriate abstention (withheld variants) | ADR 0008 |
