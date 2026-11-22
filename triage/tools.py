@@ -7,6 +7,8 @@ citations against what was actually retrieved.
 """
 from __future__ import annotations
 
+import re
+
 # JSON Schemas for tool inputs. Config C validates against these before a
 # call runs; Config B passes arguments through unchecked.
 TOOL_SPECS = {
@@ -49,8 +51,15 @@ def _match(record: dict, **criteria) -> bool:
     return all(v is None or str(record.get(k, "")).lower() == str(v).lower() for k, v in criteria.items())
 
 
+def _normalize_type(value) -> str:
+    """'sign_in', 'Sign-In' and 'signin' are one event type; different words stay different."""
+    return re.sub(r"[\s_-]", "", str(value)).lower()
+
+
 def event_search(view: dict, user=None, src_ip=None, event_type=None, **_ignored) -> list[dict]:
-    return [e for e in view["evidence"]["events"] if _match(e, user=user, src_ip=src_ip, type=event_type)]
+    return [e for e in view["evidence"]["events"]
+            if _match(e, user=user, src_ip=src_ip)
+            and (event_type is None or _normalize_type(e.get("type", "")) == _normalize_type(event_type))]
 
 
 def entity_lookup(view: dict, id=None, **_ignored) -> list[dict]:
