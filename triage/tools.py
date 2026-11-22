@@ -14,7 +14,9 @@ import re
 TOOL_SPECS = {
     "event_search": {
         "description": ("Search event logs by user and/or source IP. Returns matching events. "
-                        "event_type is optional: omit it to get every event for that user or IP."),
+                        "event_type is optional and must be an exact type name, such as signin, "
+                        "process_start or network_connection. If unsure, omit it to get every event "
+                        "for that user or IP."),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -27,7 +29,7 @@ TOOL_SPECS = {
         },
     },
     "entity_lookup": {
-        "description": "Look up context for a user account or IP address by its id.",
+        "description": "Look up context for an entity by its id: a user, host, IP address, group or role.",
         "input_schema": {
             "type": "object",
             "properties": {"id": {"type": "string", "maxLength": 200}},
