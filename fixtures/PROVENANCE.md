@@ -16,3 +16,4 @@ Who wrote each finalized case and its expected answers, for the report's method 
 | PRIV-002 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
 | PRIV-003 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
 | PRIV-004 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |
+| AUTH-101 | Drafted by AI assistant, reviewed by author | Proposed by AI assistant with reasons, reviewed and approved by author |

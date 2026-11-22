@@ -5,6 +5,13 @@ from triage import run
 from triage.agent import OllamaModel
 
 
+def _dev_only(monkeypatch):
+    # Pretend no held-out cases exist yet, so projection tests stay stable as cases are added.
+    real = run.load_cases()
+    monkeypatch.setattr(run, "load_cases",
+                        lambda split=None, family=None: [c for c in real if c["split"] == "dev" and split in (None, "dev")])
+
+
 def lines(path):
     return [json.loads(x) for x in path.read_text().splitlines() if x.strip()]
 
@@ -15,7 +22,8 @@ def test_model_names_select_the_adapter():
     assert run.get_model("scripted-demo")().name == "scripted-demo"
 
 
-def test_dry_run_covers_auth_001_only_and_projects_to_270(tmp_path, capsys):
+def test_dry_run_covers_auth_001_only_and_projects_to_270(tmp_path, capsys, monkeypatch):
+    _dev_only(monkeypatch)
     run.main(["--dry-run", "--out", str(tmp_path / "dry")])
 
     logs = lines(tmp_path / "dry" / "logs.jsonl")
@@ -94,7 +102,8 @@ def test_resume_keeps_a_model_that_ran_out_of_budget(tmp_path):
     assert len(lines(out / "logs.jsonl")) == 9
 
 
-def test_projection_uses_the_planned_30_cases_when_none_are_written_yet(tmp_path, capsys):
+def test_projection_uses_the_planned_30_cases_when_none_are_written_yet(tmp_path, capsys, monkeypatch):
+    _dev_only(monkeypatch)
     run.main(["--dry-run", "--out", str(tmp_path / "p")])
     out = capsys.readouterr().out
     assert "projected for 270 runs (planned 30 held-out cases; none written yet)" in out
@@ -102,7 +111,7 @@ def test_projection_uses_the_planned_30_cases_when_none_are_written_yet(tmp_path
 
 def test_projection_counts_the_held_out_cases_that_exist(tmp_path, capsys, monkeypatch):
     import copy
-    real = run.load_cases()
+    real = [c for c in run.load_cases() if c["split"] == "dev"]
     held = []
     for i in (1, 2):
         c = copy.deepcopy(real[0])
