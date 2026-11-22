@@ -154,28 +154,50 @@ def _table(df: pd.DataFrame) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _plots(s: pd.DataFrame, out: Path) -> None:
+def bar_chart(s: pd.DataFrame, cols: list[str], title: str, ylabel: str):
+    """Grouped bars per config, each labelled with its value so 0 and n/a stay visible."""
     import matplotlib
 
     matplotlib.use("Agg")  # no display needed (Colab, CI)
+    from matplotlib.ticker import MaxNLocator
+
+    data = s[cols].astype(float)
+    ax = data.fillna(0).plot.bar(figsize=(8, 4), rot=0)
+    ax.set_title(title), ax.set_xlabel("config"), ax.set_ylabel(ylabel)
+    rate = ylabel == "rate"
+    for container, col in zip(ax.containers, cols):
+        labels = ["n/a" if pd.isna(v) else (f"{v:.2f}".rstrip("0").rstrip(".") if rate else f"{v:g}")
+                  for v in data[col]]
+        ax.bar_label(container, labels=labels, fontsize=7, padding=2)
+    if rate:
+        ax.set_ylim(0, 1.05)  # rates on a fixed scale so plots compare across runs
+    else:
+        top = data.max().max()
+        ax.set_ylim(0, (1 if pd.isna(top) or top == 0 else top * 1.15))
+        if ylabel != "tokens":
+            ax.yaxis.set_major_locator(MaxNLocator(integer=True))  # counts are whole numbers
+    ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1))
+    ax.figure.tight_layout()
+    return ax.figure
+
+
+def _plots(s: pd.DataFrame, out: Path) -> None:
     import matplotlib.pyplot as plt
 
-    def bars(cols, title, fname, ylabel="rate"):
-        ax = s[cols].astype(float).plot.bar(figsize=(8, 4), rot=0)
-        ax.set_title(title), ax.set_xlabel("config"), ax.set_ylabel(ylabel)
-        if ylabel == "rate":
-            ax.set_ylim(0, 1.05)  # rates on a fixed scale so plots compare across runs
-        ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1))
-        plt.tight_layout(), plt.savefig(out / fname, dpi=150), plt.close()
-
-    bars(["disposition_accuracy", "macro_f1", "supported_claim_rate", "evidence_recall"],
-         "Accuracy and evidence support by config", "accuracy_support.png")
-    bars(["missed_attack_rate", "withheld_called_benign", "injection_success"],
-         "Failure rates by config (lower is better)", "failure_rates.png")
-    bars(["unauthorized_attempts", "unauthorized_executed"],
-         "Unauthorized tool use: attempted vs executed", "unauthorized.png", ylabel="count")
-    bars(ABSTAIN_CELLS, "Abstention 2x2 by config", "abstention.png", ylabel="runs")
-    bars(["mean_tokens"], "Mean tokens per run", "tokens.png", ylabel="tokens")
+    charts = [
+        (["disposition_accuracy", "macro_f1", "supported_claim_rate", "evidence_recall"],
+         "Accuracy and evidence support by config", "rate", "accuracy_support.png"),
+        (["missed_attack_rate", "withheld_called_benign", "injection_success"],
+         "Failure rates by config (lower is better)", "rate", "failure_rates.png"),
+        (["unauthorized_attempts", "unauthorized_executed"],
+         "Unauthorized tool use: attempted vs executed", "count", "unauthorized.png"),
+        (ABSTAIN_CELLS, "Abstention 2x2 by config", "runs", "abstention.png"),
+        (["mean_tokens"], "Mean tokens per run", "tokens", "tokens.png"),
+    ]
+    for cols, title, ylabel, fname in charts:
+        fig = bar_chart(s, cols, title, ylabel)
+        fig.savefig(out / fname, dpi=150)
+        plt.close(fig)
 
 
 def write_report(run_dir) -> Path:
