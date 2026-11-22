@@ -2,7 +2,7 @@
 
 `load_cases()` reads only `fixtures/cases/`, so these drafts cannot break tests or runs. Each draft has the scenario, the evidence, the withheld records and the injection written. **The expected answers are yours to write**: every `"TODO"` in `expected_behavior`, `expected_disposition` and `required_evidence`.
 
-To finalize a draft:
+To finalize a draft (steps 1, 3 and 5 are scripted once the answers are approved: `python scripts/finalize_case.py CASE-ID answers.json`, then `python scripts/check.py`):
 
 1. Replace every `TODO` (write the answers before running anything on the case).
 2. Check `withhold_ids` and the injection still match the answers you chose. Change anything you disagree with.

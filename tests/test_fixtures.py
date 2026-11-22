@@ -33,6 +33,16 @@ def test_case_ids_unique():
     assert len(ids) == len(set(ids))
 
 
+def test_event_entity_and_alert_ids_unique_across_cases():
+    # Guides (E-GDE-*) are shared on purpose; every other record belongs to one case.
+    owner = {}
+    for c in CASES:
+        ids = {i for i in all_evidence_ids(c) if not i.startswith("E-GDE-")} | {c["alert"]["alert_id"]}
+        for i in ids:
+            assert i not in owner, f"{i} is in both {owner[i]} and {c['case_id']}"
+            owner[i] = c["case_id"]
+
+
 def test_withheld_view_hides_records():
     for c in CASES:
         hidden = set(c["variants"]["withheld"].get("withhold_ids", []))
