@@ -32,3 +32,21 @@ def test_description_tells_the_model_event_type_is_optional():
     from triage.tools import TOOL_SPECS
     desc = TOOL_SPECS["event_search"]["description"].lower()
     assert "optional" in desc and "omit" in desc
+
+
+def test_entity_lookup_description_names_every_entity_kind_in_the_fixtures():
+    # A kind the description omits is one the model may never think to look up.
+    from triage.fixtures import load_cases
+    from triage.tools import TOOL_SPECS
+    desc = TOOL_SPECS["entity_lookup"]["description"].lower()
+    kinds = {e["kind"] for c in load_cases() for e in c["evidence"]["entities"]}
+    missing = {k for k in kinds if ("ip address" if k == "ip" else k) not in desc}
+    assert not missing, f"entity kinds missing from entity_lookup description: {missing}"
+
+
+def test_event_search_example_types_exist_in_the_fixtures():
+    from triage.fixtures import load_cases
+    from triage.tools import TOOL_SPECS
+    types = {e["type"] for c in load_cases() for e in c["evidence"]["events"]}
+    for example in ("signin", "process_start", "network_connection"):
+        assert example in TOOL_SPECS["event_search"]["description"] and example in types
