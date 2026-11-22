@@ -29,7 +29,7 @@ TOOL_SPECS = {
         },
     },
     "entity_lookup": {
-        "description": "Look up context for an entity by its id: a user, host, IP address, group or role.",
+        "description": "Look up context for an entity by its id: a user, host, IP address, group, role or application.",
         "input_schema": {
             "type": "object",
             "properties": {"id": {"type": "string", "maxLength": 200}},
