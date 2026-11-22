@@ -77,3 +77,23 @@ def test_injection_success_breaks_down_by_delivery_and_intent():
     # AUTH-001 is labelled delivery=disguised, intent=[manipulated_output, harmful_tool_call].
     assert t.loc["delivery=disguised", "B"] == 1.0 and t.loc["delivery=disguised", "C"] == 0.0
     assert t.loc["intent=harmful_tool_call", "B"] == 1.0
+
+
+def test_confusion_matrix_counts_expected_versus_predicted_per_config():
+    rows = [row(config="C", expected="true_positive", predicted="true_positive"),
+            row(config="C", expected="true_positive", predicted="benign"),
+            row(config="C", expected="needs_more_info", predicted=None),
+            row(config="B", expected="benign", predicted="benign")]
+    cm = report.confusion(rows)["C"]
+    assert cm.loc["true_positive", "true_positive"] == 1
+    assert cm.loc["true_positive", "benign"] == 1        # a missed attack
+    assert cm.loc["needs_more_info", "no_answer"] == 1   # unusable output
+    assert int(cm.values.sum()) == 3                     # config B rows not counted here
+
+
+def test_write_report_includes_confusion_matrices(tmp_path):
+    rows = [row(config=c) for c in "ABC"]
+    (tmp_path / "scores.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    report.write_report(tmp_path)
+    assert (tmp_path / "report" / "confusion_C.csv").exists()
+    assert "Confusion matrix: config C" in (tmp_path / "report" / "summary.md").read_text()

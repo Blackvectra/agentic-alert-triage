@@ -8,7 +8,6 @@ score.py; this module adds no judgement of its own.
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -77,6 +76,23 @@ def summarize(rows: list[dict], logs: list[dict] | None = None) -> pd.DataFrame:
     return pd.DataFrame.from_dict(out, orient="index")
 
 
+def confusion(rows: list[dict]) -> dict[str, pd.DataFrame]:
+    """Per config: counts of expected disposition (rows) by predicted disposition (columns).
+
+    Unusable output has no prediction and is counted under "no_answer".
+    """
+    cols = LABELS + ["no_answer"]
+    out = {}
+    for cfg in sorted({r["config"] for r in rows}):
+        cm = pd.DataFrame(0, index=LABELS, columns=cols)
+        for r in rows:
+            if r["config"] == cfg:
+                cm.loc[r["expected_disposition"], r["predicted_disposition"] or "no_answer"] += 1
+        cm.index.name = "expected \\ predicted"
+        out[cfg] = cm
+    return out
+
+
 def injection_by_label(rows: list[dict], cases: list[dict]) -> pd.DataFrame:
     """Injection success rate per config, by delivery technique and by attacker intent."""
     labels = {c["case_id"]: c["variants"]["injected"]["injection"] for c in cases}
@@ -108,6 +124,14 @@ def _markdown(df: pd.DataFrame) -> str:
     t = df.T  # metrics as rows, configs as columns: easier to read
     lines = ["| metric | " + " | ".join(map(str, t.columns)) + " |", "|---" * (len(t.columns) + 1) + "|"]
     lines += [f"| {idx} | " + " | ".join(fmt(v, idx in COUNT_METRICS) for v in t.loc[idx]) + " |" for idx in t.index]
+    return "\n".join(lines) + "\n"
+
+
+def _table(df: pd.DataFrame) -> str:
+    """Plain Markdown table of counts, rows and columns as given."""
+    lines = [f"| {df.index.name or ''} | " + " | ".join(map(str, df.columns)) + " |",
+             "|---" * (len(df.columns) + 1) + "|"]
+    lines += [f"| {idx} | " + " | ".join(str(int(v)) for v in df.loc[idx]) + " |" for idx in df.index]
     return "\n".join(lines) + "\n"
 
 
@@ -151,6 +175,10 @@ def write_report(run_dir) -> Path:
         by_label = injection_by_label(rows, load_cases())
     except Exception as exc:  # report still useful without the case labels
         by_label, md = pd.DataFrame(), md + [f"\n(injection breakdown unavailable: {exc})\n"]
+    md.append("\n## Confusion matrices\nRows: expected disposition. Columns: what the model answered.\n")
+    for cfg, cm in confusion(rows).items():
+        cm.to_csv(out / f"confusion_{cfg}.csv")
+        md += [f"\n### Confusion matrix: config {cfg}\n", _table(cm)]
     if not by_label.empty:
         by_label.to_csv(out / "injection_by_label.csv")
         md += ["\n## Injection success by label\n", _markdown(by_label.T)]
