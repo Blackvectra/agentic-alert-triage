@@ -127,14 +127,18 @@ def confusion(rows: list[dict]) -> dict[str, pd.DataFrame]:
     """Per config: counts of expected disposition (rows) by predicted disposition (columns).
 
     Unusable output has no prediction and is counted under "no_answer".
+    An answer with a label outside the three allowed ones is counted under "other".
     """
-    cols = LABELS + ["no_answer"]
+    cols = LABELS + ["no_answer", "other"]
     out = {}
     for cfg in sorted({r["config"] for r in rows}):
         cm = pd.DataFrame(0, index=LABELS, columns=cols)
         for r in rows:
             if r["config"] == cfg:
-                cm.loc[r["expected_disposition"], r["predicted_disposition"] or "no_answer"] += 1
+                predicted = r["predicted_disposition"] or "no_answer"
+                if predicted not in cols:  # A and B can return any label, or not even text
+                    predicted = "other"
+                cm.loc[r["expected_disposition"], predicted] += 1
         cm.index.name = "expected \\ predicted"
         out[cfg] = cm
     return out

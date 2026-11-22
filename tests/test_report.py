@@ -92,6 +92,16 @@ def test_confusion_matrix_counts_expected_versus_predicted_per_config():
     assert int(cm.values.sum()) == 3                     # config B rows not counted here
 
 
+def test_confusion_matrix_counts_unknown_labels_under_other():
+    # A and B keep answers that fail the schema, so any label can reach the report.
+    rows = [row(expected="true_positive", predicted="malicious"),
+            row(expected="benign", predicted=["benign"])]
+    cm = report.confusion(rows)["B"]
+    assert cm.loc["true_positive", "other"] == 1
+    assert cm.loc["benign", "other"] == 1
+    assert int(cm.values.sum()) == 2
+
+
 def test_write_report_includes_confusion_matrices(tmp_path):
     rows = [row(config=c) for c in "ABC"]
     (tmp_path / "scores.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
