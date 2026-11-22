@@ -86,3 +86,14 @@ def test_request_carries_tools_and_fixed_settings():
     assert sent["tool_choice"] == {"type": "auto", "disable_parallel_tool_use": True}
     assert "strict" not in sent["tools"][0]
     assert "temperature" not in sent
+
+
+def test_prompt_only_request_sends_no_tools():
+    """Config A has no tools; the API rejects tool_choice without tools."""
+    client = FakeClient([text_response("{}")])
+    model = AnthropicModel(client=client, model_id="claude-sonnet-5-5")
+
+    model.step("system prompt", [{"role": "user", "content": "ALERT: ..."}], None)
+
+    assert "tools" not in client.requests[0]
+    assert "tool_choice" not in client.requests[0]
