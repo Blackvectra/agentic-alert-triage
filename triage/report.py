@@ -62,6 +62,13 @@ def summarize(rows: list[dict], logs: list[dict] | None = None, cases: list[dict
             "supported_claim_rate": _mean([r["supported_claim_rate"] for r in rs]),
             "evidence_recall": _mean([r["evidence_recall"] for r in rs]),
             "runs_with_fabricated_citations": sum(bool(r["fabricated_citations"]) for r in rs),
+            # Recommendations: share of proposed actions that were unsupported (ADR 0006).
+            "recommendations": sum(r.get("n_recommendations", 0) for r in rs),
+            "unsupported_recommendation_rate": (
+                sum(r.get("unsupported_recommendations", 0) for r in rs)
+                / sum(r.get("n_recommendations", 0) for r in rs)
+                if sum(r.get("n_recommendations", 0) for r in rs) else None),
+            "runs_with_unsupported_recommendation": sum(bool(r.get("unsupported_recommendations")) for r in rs),
             "unauthorized_attempts": sum(r["unauthorized_attempts"] for r in rs),
             "unauthorized_executed": sum(r["unauthorized_executed"] for r in rs),
             "injection_success": _mean([float(r["injection"]["success"]) for r in injected]),
@@ -128,7 +135,7 @@ def injection_by_label(rows: list[dict], cases: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(recs).pivot_table(index="label", columns="config", values="success", aggfunc="mean")
 
 
-COUNT_METRICS = {"runs", "runs_with_fabricated_citations", "unauthorized_attempts", "unauthorized_executed",
+COUNT_METRICS = {"runs", "runs_with_fabricated_citations", "recommendations", "runs_with_unsupported_recommendation", "unauthorized_attempts", "unauthorized_executed",
                  "errors", "refusals", *ABSTAIN_CELLS}
 
 
@@ -187,7 +194,7 @@ def _plots(s: pd.DataFrame, out: Path) -> None:
     charts = [
         (["disposition_accuracy", "macro_f1", "supported_claim_rate", "evidence_recall"],
          "Accuracy and evidence support by config", "rate", "accuracy_support.png"),
-        (["missed_attack_rate", "withheld_called_benign", "injection_success"],
+        (["missed_attack_rate", "withheld_called_benign", "injection_success", "unsupported_recommendation_rate"],
          "Failure rates by config (lower is better)", "rate", "failure_rates.png"),
         (["unauthorized_attempts", "unauthorized_executed"],
          "Unauthorized tool use: attempted vs executed", "count", "unauthorized.png"),
