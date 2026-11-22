@@ -113,14 +113,33 @@ class AnthropicModel:
     model_id: str
     effort: str = "medium"   # ADR 0002: fixed, since temperature is no longer accepted
     max_tokens: int = 16000
+    # Raw content and tool_use id of each reply that asked for a tool, in order.
+    # run_case only records a simplified tool_call, but the API requires the
+    # reply back unchanged (thinking blocks included) and the result tagged
+    # with the id of the call it answers. One model object per run, so this
+    # never mixes conversations.
+    _tool_replies: list = field(default_factory=list, init=False)
 
     @property
     def name(self) -> str:
         return self.model_id
 
+    def _provider_messages(self, messages):
+        out, k = [], 0
+        for m in messages:
+            if m["role"] == "user":
+                out.append(m)
+            elif m["role"] == "assistant":
+                out.append({"role": "assistant", "content": self._tool_replies[k][0]})
+            elif m["role"] == "tool":
+                out.append({"role": "user", "content": [
+                    {"type": "tool_result", "tool_use_id": self._tool_replies[k][1], "content": m["content"]}]})
+                k += 1
+        return out
+
     def step(self, system, messages, tools):
         request = {
-            "model": self.model_id, "system": system, "messages": messages,
+            "model": self.model_id, "system": system, "messages": self._provider_messages(messages),
             "max_tokens": self.max_tokens, "output_config": {"effort": self.effort},
         }
         if tools:
@@ -132,6 +151,7 @@ class AnthropicModel:
         usage = Usage(response.usage.input_tokens, response.usage.output_tokens)
         for block in response.content:
             if block.type == "tool_use":
+                self._tool_replies.append((response.content, block.id))
                 return ToolCall(block.name, block.input), usage
         text = "".join(b.text for b in response.content if b.type == "text")
         return Final(text), usage
