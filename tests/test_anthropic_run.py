@@ -49,3 +49,15 @@ def test_second_request_replays_reply_and_pairs_tool_result_with_its_id():
     assert result["type"] == "tool_result"
     assert result["tool_use_id"] == "toolu_01"
     assert "E-EVT-001" in result["content"]
+
+
+def test_b_and_c_send_byte_identical_tool_definitions():
+    """ADR 0001: the only difference between B and C is our harness's guardrails."""
+    case, view = auth_001()
+    sent = {}
+    for config in ("B", "C"):
+        client = FakeClient([text_response(ANSWER)])
+        run_case(case, "complete", config, AnthropicModel(client=client, model_id="claude-sonnet-5-5"), view)
+        sent[config] = json.dumps([client.requests[0]["tools"], client.requests[0]["tool_choice"]])
+
+    assert sent["B"] == sent["C"]
