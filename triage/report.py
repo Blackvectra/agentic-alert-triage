@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from .agent import is_harness_error
 from .jsonl import read_jsonl
 
 CONFIGS = ["A", "B", "C"]
@@ -53,6 +54,8 @@ def summarize(rows: list[dict], logs: list[dict] | None = None, cases: list[dict
         cells = {c: sum(r["abstain_cell"] == c for r in rs) for c in ABSTAIN_CELLS}
         m = {
             "runs": len(rs),
+            # Server or harness failures (e.g. Ollama HTTP 500), kept apart from the model's answers.
+            "harness_errors": sum(is_harness_error(r.get("error")) for r in rs),
             "disposition_accuracy": _mean([float(r["disposition_correct"]) for r in rs]),
             "macro_f1": _macro_f1([r["expected_disposition"] for r in rs], [r["predicted_disposition"] for r in rs]),
             # Attacks not called true_positive (Tsegai et al. 2026 lead with this rate).
