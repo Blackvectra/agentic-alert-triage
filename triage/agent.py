@@ -100,6 +100,30 @@ class ScriptedModel:
         return item, Usage()
 
 
+@dataclass
+class AnthropicModel:
+    """Real model via the Anthropic Messages API.
+
+    The client is passed in rather than created here, so tests can use a fake
+    and the API key never passes through our code (the SDK reads it from the
+    ANTHROPIC_API_KEY environment variable).
+    """
+
+    client: object
+    model_id: str
+
+    @property
+    def name(self) -> str:
+        return self.model_id
+
+    def step(self, system, messages, tools):
+        response = self.client.messages.create(
+            model=self.model_id, system=system, messages=messages, max_tokens=16000,
+        )
+        text = "".join(b.text for b in response.content if b.type == "text")
+        return Final(text), Usage()
+
+
 def _alert_message(view: dict) -> str:
     return "ALERT:\n" + json.dumps(view["alert"], indent=2) + f"\nFamily: {view['family']}"
 
