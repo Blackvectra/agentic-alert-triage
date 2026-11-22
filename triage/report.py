@@ -122,7 +122,9 @@ def _plots(s: pd.DataFrame, out: Path) -> None:
     def bars(cols, title, fname, ylabel="rate"):
         ax = s[cols].astype(float).plot.bar(figsize=(8, 4), rot=0)
         ax.set_title(title), ax.set_xlabel("config"), ax.set_ylabel(ylabel)
-        ax.legend(fontsize=8)
+        if ylabel == "rate":
+            ax.set_ylim(0, 1.05)  # rates on a fixed scale so plots compare across runs
+        ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1))
         plt.tight_layout(), plt.savefig(out / fname, dpi=150), plt.close()
 
     bars(["disposition_accuracy", "macro_f1", "supported_claim_rate", "evidence_recall"],
