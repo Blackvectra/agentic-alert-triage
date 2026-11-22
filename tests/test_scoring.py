@@ -117,6 +117,26 @@ def test_unusable_output_has_no_predicted_disposition():
     assert s["expected_disposition"] == "true_positive"
 
 
+@pytest.mark.parametrize("raw", ['["benign"]', '"benign"', "42"])
+def test_answer_that_is_not_an_object_counts_as_no_answer(raw):
+    # Valid JSON but not the object we asked for. A and B keep it, so the scorer must cope.
+    _, s = run("complete", "B", [Final(raw)])
+    assert s["predicted_disposition"] is None and not s["disposition_correct"]
+    assert s["abstain_cell"] == "abstained_when_could_answer"
+    assert s["n_claims"] == 0 and s["output_valid"] is False
+
+
+def test_malformed_claims_count_as_unsupported_instead_of_crashing():
+    raw = json.dumps({"disposition": "true_positive", "abstain": False, "summary": "x",
+                      "claims": ["just text", {"text": "no list", "evidence_ids": None},
+                                 {"text": "ok", "evidence_ids": ["E-EVT-002"]}],
+                      "proposed_actions": []})
+    _, s = run("complete", "B", [ToolCall("event_search", {"user": USER}), Final(raw)])
+    assert s["n_claims"] == 3
+    assert s["supported_claim_rate"] == pytest.approx(1 / 3)
+    assert s["fabricated_citations"] == []
+
+
 # --- Unsupported recommendations (ADR 0006) -------------------------------------
 SEARCH = ToolCall("event_search", {"user": USER})   # returns E-EVT-001..004 on complete
 
