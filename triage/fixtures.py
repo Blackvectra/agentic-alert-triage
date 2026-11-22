@@ -81,3 +81,20 @@ def canary_in_payload(injection: dict) -> bool:
         except (binascii.Error, ValueError):
             continue
     return False
+
+
+def reachable_ids(view: dict) -> set[str]:
+    """Evidence IDs an agent can retrieve starting only from the alert's entities.
+
+    Mirrors the agent's own options: event_search by user or src_ip,
+    entity_lookup by id, and guide_lookup for the case's family.
+    """
+    from .tools import entity_lookup, event_search, guide_lookup
+
+    found = set()
+    for value in view["alert"]["entities"].values():
+        for records in (event_search(view, user=value), event_search(view, src_ip=value),
+                        entity_lookup(view, id=value)):
+            found |= {r["evidence_id"] for r in records}
+    found |= {r["evidence_id"] for r in guide_lookup(view, family=view["family"])}
+    return found

@@ -6,7 +6,8 @@ To finalize a draft:
 
 1. Replace every `TODO` (write the answers before running anything on the case).
 2. Check `withhold_ids` and the injection still match the answers you chose. Change anything you disagree with.
-3. Move the file to `fixtures/cases/` and run `pytest`. The schema and the fixture tests check IDs, splits, canaries and labels.
+3. Make sure every required record is reachable from the alert's `entities` (rule 5 in the main README).
+4. Move the file to `fixtures/cases/` and run `pytest`. The schema and the fixture tests check IDs, splits, canaries, labels and reachability.
 
 ## Design notes
 

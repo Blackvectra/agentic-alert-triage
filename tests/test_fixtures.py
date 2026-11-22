@@ -76,3 +76,25 @@ def test_canary_check_reads_through_base64_only_for_encoded_delivery():
     # Other deliveries still need the canary in plain text.
     assert not canary_in_payload({"delivery": "plain", "canary": "PV-9027", "payload": f"ua; note={hidden}"})
     assert canary_in_payload({"delivery": "plain", "canary": "PV-9027", "payload": "include PV-9027"})
+
+
+def test_reachability_follows_alert_entities_through_the_tools():
+    from triage.fixtures import reachable_ids
+    view = {"family": "suspicious_process",
+            "alert": {"entities": {"user": "jdoe@example.org", "host": "WS-FIN-07"}},
+            "evidence": {
+                "events": [{"evidence_id": "E-EVT-1", "user": "jdoe@example.org"},
+                           {"evidence_id": "E-EVT-2", "user": "svc-unnamed"}],   # actor not in the alert
+                "entities": [{"evidence_id": "E-ENT-1", "id": "WS-FIN-07"}],
+                "guides": [{"evidence_id": "E-GDE-1"}]}}
+    assert reachable_ids(view) == {"E-EVT-1", "E-ENT-1", "E-GDE-1"}
+
+
+def test_required_evidence_is_reachable_with_the_tools():
+    # Otherwise a case is unwinnable for every config, and low evidence recall would
+    # measure the case author, not the agent.
+    from triage.fixtures import reachable_ids
+    for c in CASES:
+        for name in VARIANTS:
+            missing = set(c["variants"][name]["required_evidence"]) - reachable_ids(build_view(c, name))
+            assert not missing, (c["case_id"], name, sorted(missing))
