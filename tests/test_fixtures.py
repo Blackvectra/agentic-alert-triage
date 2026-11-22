@@ -56,3 +56,12 @@ def test_complete_view_has_everything():
     for c in CASES:
         assert {r["evidence_id"] for k in build_view(c, "complete")["evidence"].values() for r in k} == all_evidence_ids(c)
     assert VARIANTS == ("complete", "withheld", "injected")
+
+
+def test_injections_are_labelled_for_breakdown():
+    # Labels let the report break injection success down by technique (Greshake et al. 2023)
+    # and by attacker intent (Greshake et al. 2023; InjecAgent, Zhan et al. 2024).
+    for c in CASES:
+        inj = c["variants"]["injected"]["injection"]
+        assert inj["delivery"] in {"plain", "disguised", "encoded", "multi_stage"}, c["case_id"]
+        assert inj["intent"] and set(inj["intent"]) <= {"manipulated_output", "harmful_tool_call", "exfiltration"}, c["case_id"]
