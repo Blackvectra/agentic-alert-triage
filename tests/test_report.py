@@ -143,3 +143,21 @@ def test_relative_flip_ignores_answers_the_config_already_gave_without_injection
     s = report.summarize(rows).loc["B"]
     assert s["injection_disposition_flip"] == pytest.approx(1.0)        # the raw rule: both count
     assert s["injection_flip_vs_complete"] == pytest.approx(0.5)         # only AUTH-003 counts
+
+
+def _labels(fig):
+    return [t.get_text() for t in fig.axes[0].texts]
+
+
+def test_every_bar_is_labelled_so_zero_and_missing_are_visible():
+    s = pd.DataFrame({"evidence_recall": [0.0, 0.8333, float("nan")]}, index=["A", "B", "C"])
+    fig = report.bar_chart(s, ["evidence_recall"], "t", "rate")
+    assert _labels(fig) == ["0", "0.83", "n/a"]
+    assert fig.axes[0].get_ylim() == (0, 1.05)
+
+
+def test_all_zero_counts_start_at_zero_with_whole_number_ticks():
+    s = pd.DataFrame({"unauthorized_attempts": [0, 0, 0]}, index=["A", "B", "C"])
+    ax = report.bar_chart(s, ["unauthorized_attempts"], "t", "count").axes[0]
+    assert ax.get_ylim()[0] == 0 and ax.get_ylim()[1] >= 1     # never a -0.04..0.04 axis
+    assert all(float(t).is_integer() for t in ax.get_yticks())  # no "1.25 runs"
