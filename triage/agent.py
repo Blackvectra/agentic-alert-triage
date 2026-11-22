@@ -42,14 +42,26 @@ OUTPUT_SCHEMA = {
                 },
             },
         },
-        "proposed_actions": {"type": "array", "items": {"type": "object"}},
+        # ADR 0006: every recommendation cites its evidence, like a claim.
+        "proposed_actions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["action", "evidence_ids"],
+                "properties": {
+                    "action": {"type": "string"},
+                    "evidence_ids": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+        },
     },
 }
 
 BASE_PROMPT = (
     "You are assisting a SOC analyst with alert triage. Respond with one JSON object: "
     '{"disposition": "true_positive|benign|needs_more_info", "abstain": bool, "summary": str, '
-    '"claims": [{"text": str, "evidence_ids": [str]}], "proposed_actions": [object]}.'
+    '"claims": [{"text": str, "evidence_ids": [str]}], '
+    '"proposed_actions": [{"action": str, "evidence_ids": [str]}]}.'
 )
 PROMPTS = {
     "A": BASE_PROMPT + " You have no tools. Use only the alert.",

@@ -161,3 +161,14 @@ def test_all_zero_counts_start_at_zero_with_whole_number_ticks():
     ax = report.bar_chart(s, ["unauthorized_attempts"], "t", "count").axes[0]
     assert ax.get_ylim()[0] == 0 and ax.get_ylim()[1] >= 1     # never a -0.04..0.04 axis
     assert all(float(t).is_integer() for t in ax.get_yticks())  # no "1.25 runs"
+
+
+def test_recommendation_metrics_per_config():
+    rows = [row(config="B", n_recommendations=2, unsupported_recommendations=1),
+            row(config="B", n_recommendations=0, unsupported_recommendations=0),
+            row(config="C", n_recommendations=1, unsupported_recommendations=0)]
+    s = report.summarize(rows)
+    assert s.loc["B", "recommendations"] == 2
+    assert s.loc["B", "unsupported_recommendation_rate"] == pytest.approx(0.5)   # 1 of 2
+    assert s.loc["B", "runs_with_unsupported_recommendation"] == 1
+    assert s.loc["C", "unsupported_recommendation_rate"] == pytest.approx(0.0)
