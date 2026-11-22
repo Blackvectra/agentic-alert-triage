@@ -111,15 +111,24 @@ class AnthropicModel:
 
     client: object
     model_id: str
+    effort: str = "medium"   # ADR 0002: fixed, since temperature is no longer accepted
+    max_tokens: int = 16000
 
     @property
     def name(self) -> str:
         return self.model_id
 
     def step(self, system, messages, tools):
-        response = self.client.messages.create(
-            model=self.model_id, system=system, messages=messages, max_tokens=16000,
-        )
+        request = {
+            "model": self.model_id, "system": system, "messages": messages,
+            "max_tokens": self.max_tokens, "output_config": {"effort": self.effort},
+        }
+        if tools:
+            # ADR 0001: send tool definitions exactly as given (no "strict"), identical for B and C.
+            # One tool call per turn so run_case's budget counts calls one at a time.
+            request["tools"] = tools
+            request["tool_choice"] = {"type": "auto", "disable_parallel_tool_use": True}
+        response = self.client.messages.create(**request)
         usage = Usage(response.usage.input_tokens, response.usage.output_tokens)
         for block in response.content:
             if block.type == "tool_use":
