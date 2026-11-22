@@ -1,0 +1,13 @@
+[project]
+name = "triage"
+version = "0.1.0"
+description = "Trustworthy Agentic AI for Security Alert Triage (EE 672 semester project)"
+requires-python = ">=3.11"
+dependencies = ["jsonschema>=4.23"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3"]
+notebook = ["jupyterlab>=4.2", "pandas>=2.2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
