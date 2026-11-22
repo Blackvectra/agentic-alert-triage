@@ -82,6 +82,7 @@ Plan: 12 dev cases, 30 held-out (10 per family). First run: 30 x 3 x 3 = 270 eva
 ## Still to do
 
 - [ ] Dry run with the local model in Colab: confirm it calls tools and produces valid JSON, and note the projected time for 270 runs
-- [ ] Finalize drafts AUTH-002..004 (expected answers), then write the remaining dev cases for the other two families
-- [ ] Write the 30 held-out cases (10 per family) with a mix of injection delivery and intent labels
+- [x] Finalize drafts AUTH-002..004 (expected answers), then write the remaining dev cases for the other two families
+- [x] Write the 30 held-out cases (10 per family) with a mix of injection delivery and intent labels
+- [ ] Record the model choice: apply ADR 0007 with `python scripts/select_model.py` and update ADR 0004 to name the chosen model
 - [ ] Held-out pass: 30 x 3 x 3 = 270 runs, then `python -m triage.report`
