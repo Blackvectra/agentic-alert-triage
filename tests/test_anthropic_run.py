@@ -61,3 +61,10 @@ def test_b_and_c_send_byte_identical_tool_definitions():
         sent[config] = json.dumps([client.requests[0]["tools"], client.requests[0]["tool_choice"]])
 
     assert sent["B"] == sent["C"]
+
+
+def test_log_says_refusals_were_measured_for_the_anthropic_adapter():
+    case, view = auth_001()
+    client = FakeClient([text_response(ANSWER)])
+    log = run_case(case, "complete", "B", AnthropicModel(client=client, model_id="claude-sonnet-5-5"), view)
+    assert log["refusals_measured"] is True

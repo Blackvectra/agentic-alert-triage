@@ -70,8 +70,11 @@ def summarize(rows: list[dict], logs: list[dict] | None = None) -> pd.DataFrame:
         }
         if logs is not None:
             # Provider refusals are reported apart from guardrail abstentions (ADR 0003).
-            m["refusals"] = sum(any(str(s).startswith("refusal") for s in l.get("stop_reasons", []))
-                                for l in logs if l["config"] == cfg)
+            # A model that cannot report refusals (local Ollama, scripted) shows n/a, not 0.
+            cfg_logs = [l for l in logs if l["config"] == cfg]
+            m["refusals"] = (sum(any(str(s).startswith("refusal") for s in l.get("stop_reasons", []))
+                                 for l in cfg_logs)
+                             if any(l.get("refusals_measured") for l in cfg_logs) else None)
         out[cfg] = m
     return pd.DataFrame.from_dict(out, orient="index")
 

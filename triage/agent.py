@@ -114,6 +114,7 @@ class AnthropicModel:
     model_id: str
     effort: str = "medium"   # ADR 0002: fixed, since temperature is no longer accepted
     max_tokens: int = 16000
+    reports_refusals = True  # the Messages API returns stop_reason "refusal" (ADR 0003)
     # Raw content and tool_use id of each reply that asked for a tool, in order.
     # run_case only records a simplified tool_call, but the API requires the
     # reply back unchanged (thinking blocks included) and the result tagged
@@ -267,6 +268,8 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
         "model": model.name, "tool_calls": [], "output_raw": None, "output": None,
         "output_valid": None, "gate": [], "input_tokens": 0, "output_tokens": 0, "error": None,
         "model_settings": getattr(model, "settings", {}), "prompt_sha256": prompt_sha256,
+        # Only providers that can refuse report it; the report shows n/a for the rest.
+        "refusals_measured": getattr(model, "reports_refusals", False),
     }
     t0 = time.monotonic()
     try:

@@ -1,6 +1,7 @@
 """report.py turns score rows into per-config metrics. Expected values worked out by hand."""
 import json
 
+import pandas as pd
 import pytest
 
 from triage import report
@@ -97,3 +98,14 @@ def test_write_report_includes_confusion_matrices(tmp_path):
     report.write_report(tmp_path)
     assert (tmp_path / "report" / "confusion_C.csv").exists()
     assert "Confusion matrix: config C" in (tmp_path / "report" / "summary.md").read_text()
+
+
+def test_refusals_are_not_applicable_when_the_model_cannot_report_them():
+    rows = [row(config="B"), row(config="C")]
+    logs = [{"config": "B", "stop_reasons": ["stop"], "refusals_measured": False},
+            {"config": "C", "stop_reasons": ["refusal:cyber"], "refusals_measured": True}]
+    s = report.summarize(rows, logs)
+    assert pd.isna(s.loc["B", "refusals"])  # e.g. a local Ollama model: missing, not 0
+    assert s.loc["C", "refusals"] == 1
+    refusal_row = next(l for l in report._markdown(s).splitlines() if l.startswith("| refusals |"))
+    assert refusal_row == "| refusals | n/a | 1 |"

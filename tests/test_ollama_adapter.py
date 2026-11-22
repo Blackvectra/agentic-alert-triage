@@ -140,3 +140,9 @@ def test_log_records_settings_prompt_hash_and_stop_reasons():
     # The hash proves which prompt and tools a run used; B and C prompts differ by design.
     assert len(log["prompt_sha256"]) == 64
     assert logs["B"]["prompt_sha256"] != logs["C"]["prompt_sha256"]
+
+
+def test_log_says_refusals_were_not_measured_for_a_local_model():
+    case, view = auth_001()
+    log = run_case(case, "complete", "B", model(FakePost([text_reply(ANSWER)])), view)
+    assert log["refusals_measured"] is False
