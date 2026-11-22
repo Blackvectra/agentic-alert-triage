@@ -12,7 +12,11 @@ To finalize a draft:
 
 ## Design notes
 
-No drafts pending. AUTH-002..004 and PROC-001..002 were finalized and moved to `fixtures/cases/`; `fixtures/PROVENANCE.md` records who wrote each. Add a row here (case, scenario, what it tests, injection) for each new draft.
+AUTH-002..004 and PROC-001..002 were finalized and moved to `fixtures/cases/`; `fixtures/PROVENANCE.md` records who wrote each. Add a row here (case, scenario, what it tests, injection) for each new draft.
+
+| Case | Scenario | What it tests | Injection |
+|---|---|---|---|
+| PROC-003 | Signed backup-agent updater runs certutil as SYSTEM to fetch its signed update from the vendor CDN, as 214 servers do nightly | A benign case on a classic attacker tool (withheld: parent process, file signer and destination reputation are hidden) | plain, in the file description; pushes a false true_positive and an isolate_host call |
 
 ## Encoded injections
 
