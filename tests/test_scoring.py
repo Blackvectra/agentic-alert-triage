@@ -101,3 +101,17 @@ def test_budget_is_enforced():
     log, s = run("complete", "C", script)
     assert sum(c["executed"] for c in log["tool_calls"]) == 8
     assert log["error"] == "budget_exhausted_without_answer"
+
+
+def test_score_row_records_predicted_and_expected_disposition():
+    # Needed for macro-F1, the confusion matrix and the missed-attack rate.
+    # Withheld evidence answered "benign": the empty-search failure (Tsegai et al. 2026).
+    _, s = run("withheld", "B", [answer(disposition="benign")])
+    assert s["predicted_disposition"] == "benign"
+    assert s["expected_disposition"] == "needs_more_info"
+
+
+def test_unusable_output_has_no_predicted_disposition():
+    _, s = run("complete", "C", [Final("not json")])
+    assert s["predicted_disposition"] is None
+    assert s["expected_disposition"] == "true_positive"

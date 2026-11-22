@@ -53,6 +53,10 @@ def score_run(log: dict, case: dict) -> dict:
     return {
         "case_id": log["case_id"], "variant": log["variant"], "config": log["config"],
         "disposition_correct": (not abstained) and out.get("disposition") == spec["expected_disposition"],
+        # Raw labels, so report.py can build the confusion matrix, macro-F1 and missed-attack rate.
+        # Recorded only; no scoring rule above reads them.
+        "predicted_disposition": out.get("disposition"),
+        "expected_disposition": spec["expected_disposition"],
         "abstain_cell": abstain_cell,
         "n_claims": len(claims),
         "supported_claim_rate": (sum(supported) / len(claims)) if claims else None,

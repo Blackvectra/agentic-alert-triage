@@ -8,3 +8,4 @@ runs/*
 desktop.ini
 Thumbs.db
 .DS_Store
+*.egg-info/
