@@ -78,3 +78,50 @@ def test_only_the_first_of_several_tool_calls_is_used():
     reply = tool_reply(("event_search", {"user": "a"}), ("entity_lookup", {"id": "a"}))
     act, _ = model(FakePost([reply])).step("sys", USER_MSG, None)
     assert act == ToolCall("event_search", {"user": "a"})
+
+
+# --- Seam 2: full run_case runs driven by OllamaModel ---------------------------
+import json  # noqa: E402
+
+from triage.agent import run_case  # noqa: E402
+from triage.fixtures import build_view, load_cases  # noqa: E402
+
+ANSWER = json.dumps({"disposition": "true_positive", "abstain": False, "summary": "s",
+                     "claims": [{"text": "c", "evidence_ids": ["E-EVT-001"]}], "proposed_actions": []})
+
+
+def auth_001():
+    case = next(c for c in load_cases("dev", "suspicious_auth") if c["case_id"] == "AUTH-001")
+    return case, build_view(case, "complete")
+
+
+def test_second_request_replays_the_used_call_and_names_the_tool_result():
+    case, view = auth_001()
+    post = FakePost([tool_reply(("event_search", {"user": "jdoe@example.org"}), ("entity_lookup", {"id": "x"})),
+                     text_reply(ANSWER)])
+
+    log = run_case(case, "complete", "B", model(post), view)
+
+    assert log["error"] is None
+    msgs = post.requests[1][1]["messages"]
+    assert [m["role"] for m in msgs] == ["system", "user", "assistant", "tool"]
+    # Only the call that actually ran is replayed, so the model never waits on an unanswered call.
+    assert msgs[2]["tool_calls"] == [{"function": {"name": "event_search", "arguments": {"user": "jdoe@example.org"}}}]
+    assert msgs[3]["tool_name"] == "event_search"
+    assert "E-EVT-001" in msgs[3]["content"]
+
+
+def test_b_and_c_send_byte_identical_tool_definitions():
+    case, view = auth_001()
+    sent = {}
+    for config in ("B", "C"):
+        post = FakePost([text_reply(ANSWER)])
+        run_case(case, "complete", config, model(post), view)
+        sent[config] = json.dumps(post.requests[0][1]["tools"])
+    assert sent["B"] == sent["C"]
+
+
+def test_arguments_sent_as_a_json_string_are_decoded():
+    # Some models return arguments as a JSON string rather than an object.
+    act, _ = model(FakePost([tool_reply(("event_search", '{"user": "a"}'))])).step("sys", USER_MSG, None)
+    assert act == ToolCall("event_search", {"user": "a"})

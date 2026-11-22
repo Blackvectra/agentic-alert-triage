@@ -183,6 +183,9 @@ class OllamaModel:
     # Ollama's default context is small and truncates silently; a long tool
     # conversation must fit or the model loses the alert.
     num_ctx: int = 16384
+    # The assistant message for each call that ran, rebuilt to hold only that call.
+    # One model object per run, so conversations never mix.
+    _tool_replies: list = field(default_factory=list, init=False)
 
     @property
     def name(self) -> str:
@@ -191,7 +194,7 @@ class OllamaModel:
     def step(self, system, messages, tools):
         payload = {"model": self.model_id, "stream": False,
                    "options": {"temperature": self.temperature, "seed": self.seed, "num_ctx": self.num_ctx},
-                   "messages": [{"role": "system", "content": system}] + messages}
+                   "messages": [{"role": "system", "content": system}] + self._provider_messages(messages)}
         if tools:
             # Same definitions for B and C (ADR 0001), in Ollama's function format.
             payload["tools"] = [{"type": "function", "function": {
@@ -203,8 +206,30 @@ class OllamaModel:
         calls = message.get("tool_calls") or []
         if calls:
             fn = calls[0]["function"]
-            return ToolCall(fn["name"], fn["arguments"]), usage
+            args = fn["arguments"]
+            if isinstance(args, str):
+                # Undecodable arguments stay visible as invalid input: C rejects them, B runs them.
+                try:
+                    args = json.loads(args)
+                except json.JSONDecodeError:
+                    args = {"_unparsed_arguments": args}
+            # Replay only the call that runs, so the model never waits on an unanswered call.
+            self._tool_replies.append({"role": "assistant", "content": message.get("content", ""),
+                                       "tool_calls": [{"function": {"name": fn["name"], "arguments": args}}]})
+            return ToolCall(fn["name"], args), usage
         return Final(message.get("content", "")), usage
+
+    def _provider_messages(self, messages):
+        out, k = [], 0
+        for m in messages:
+            if m["role"] == "user":
+                out.append(m)
+            elif m["role"] == "assistant":
+                out.append(self._tool_replies[k])
+            elif m["role"] == "tool":
+                out.append({"role": "tool", "tool_name": m["name"], "content": m["content"]})
+                k += 1
+        return out
 
 
 def _alert_message(view: dict) -> str:
