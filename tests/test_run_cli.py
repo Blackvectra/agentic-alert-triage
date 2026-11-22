@@ -134,3 +134,14 @@ def test_resume_reruns_runs_made_with_different_prompts_or_tools(tmp_path):
     again = lines(out / "logs.jsonl")
     assert len(again) == 9 and len(lines(out / "scores.jsonl")) == 9
     assert all(l["prompt_sha256"] != "0" * 64 for l in again)
+
+
+def test_model_name_typo_fails_fast_with_the_valid_forms():
+    import pytest
+    for ok in ("scripted-demo", "ollama:qwen2.5:7b", "anthropic:claude-sonnet-5-5"):
+        run.check_model_name(ok)   # no error
+    with pytest.raises(SystemExit) as err:
+        run.check_model_name("ollm:qwen2.5:7b")   # the typo seen in Colab
+    assert "ollama:<tag>" in str(err.value)
+    with pytest.raises(SystemExit):
+        run.check_model_name("ollama:")            # prefix with no model tag
