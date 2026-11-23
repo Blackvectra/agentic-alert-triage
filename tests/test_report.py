@@ -230,3 +230,17 @@ def test_useful_answer_rate_counts_only_runs_where_an_answer_was_expected():
                 abstain_cell="correct_abstain"),                           # should abstain: left out
             row(config="C", error="HTTPError: HTTP Error 500", output_valid=False)]  # crash: left out
     assert report.summarize(rows).loc["C", "useful_answer_rate"] == pytest.approx(1 / 3)
+
+
+def test_mcnemar_pairs_b_and_c_by_case_and_variant():
+    # Four pairs where only B is right, one where only C is right, one where both are right.
+    pairs = [("AUTH-00%d" % i, True, False) for i in range(1, 5)] + [("AUTH-005", False, True), ("AUTH-006", True, True)]
+    rows = []
+    for case, b_ok, c_ok in pairs:
+        rows.append(row(config="B", case_id=case, predicted="true_positive" if b_ok else "benign"))
+        rows.append(row(config="C", case_id=case, predicted="true_positive" if c_ok else "benign"))
+    rows.append(row(config="C", case_id="AUTH-007", error="harness: timeout"))  # no B partner: dropped
+    m = report.mcnemar(rows, "B", "C")
+    # Exact two-sided test on 5 disagreements: 2 * P(X <= 1 | n=5, p=0.5) = 2 * 6/32.
+    assert (m["only_first_correct"], m["only_second_correct"], m["pairs"]) == (4, 1, 6)
+    assert m["p_value"] == pytest.approx(0.375)
