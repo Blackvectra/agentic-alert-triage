@@ -50,3 +50,15 @@ def test_event_search_example_types_exist_in_the_fixtures():
     types = {e["type"] for c in load_cases() for e in c["evidence"]["events"]}
     for example in ("signin", "process_start", "network_connection"):
         assert example in TOOL_SPECS["event_search"]["description"] and example in types
+
+
+def test_event_search_description_says_there_is_no_host_filter():
+    # Dev run (2026-11-23): on PROC cases the model passed a host, which the tool does not accept.
+    # C rejected those 9 calls; B ran 3 with the host silently ignored (ADR 0010).
+    import jsonschema
+    import pytest
+    from triage.tools import TOOL_SPECS
+    spec = TOOL_SPECS["event_search"]
+    assert "no host filter" in spec["description"]
+    with pytest.raises(jsonschema.ValidationError):  # the description and the schema agree
+        jsonschema.validate({"user": USER, "host": "WS-FIN-12"}, spec["input_schema"])

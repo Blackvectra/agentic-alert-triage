@@ -14,6 +14,8 @@ import re
 TOOL_SPECS = {
     "event_search": {
         "description": ("Search event logs by user and/or source IP. Returns matching events. "
+                        "user, src_ip and event_type are the only filters: there is no host filter, "
+                        "so search by user or IP and read the host in the results. "
                         "event_type is optional and must be an exact type name, such as signin, "
                         "process_start or network_connection. If unsure, omit it to get every event "
                         "for that user or IP."),
