@@ -15,11 +15,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from .agent import is_harness_error
+from .agent import MAIN_CONFIGS, is_harness_error
 from .fixtures import VARIANTS
 from .jsonl import read_jsonl
 
-CONFIGS = ["A", "B", "C"]
+CONFIGS = MAIN_CONFIGS  # C2 is added to the report in its own step (ADR 0012)
 LABELS = ["true_positive", "benign", "needs_more_info"]
 ABSTAIN_CELLS = ["answered", "correct_abstain", "abstained_when_could_answer", "answered_when_should_abstain"]
 

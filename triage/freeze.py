@@ -10,12 +10,12 @@ import json
 import sys
 from pathlib import Path
 
-from triage.agent import prompt_fingerprint
+from triage.agent import MAIN_CONFIGS, prompt_fingerprint
 
 ROOT = Path(__file__).resolve().parent.parent
 FROZEN = ROOT / "FROZEN.json"
 CASES = ROOT / "fixtures" / "cases"
-CONFIGS = ("A", "B", "C")
+CONFIGS = MAIN_CONFIGS  # C2 joins the check when it is frozen (ADR 0012)
 
 
 def _fixtures_sha256(cases: Path) -> str:

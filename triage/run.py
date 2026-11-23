@@ -15,13 +15,13 @@ import statistics
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .agent import (ANSWER_PARSER_VERSION, PROMPTS, Final, OllamaModel, ScriptedModel, ToolCall, is_harness_error,
+from .agent import (ANSWER_PARSER_VERSION, MAIN_CONFIGS, PROMPTS, Final, OllamaModel, ScriptedModel, ToolCall, is_harness_error,
                     prompt_fingerprint, run_case)
 from .fixtures import ROOT, VARIANTS, build_view, load_cases
 from .jsonl import read_jsonl
 from .score import score_run
 
-CONFIGS = ("A", "B", "C")
+CONFIGS = MAIN_CONFIGS  # default run; C2 only with --configs
 PLANNED_HELDOUT_CASES = 30  # the proposal's held-out set: 30 x 3 variants x 3 configs = 270 runs
 RUNS_PER_CASE = len(VARIANTS) * len(CONFIGS)
 DRY_RUN_CASE = "AUTH-001"

@@ -69,3 +69,12 @@ def test_invalid_tool_arguments_are_rejected_as_in_c():
 def test_adding_c2_leaves_the_frozen_a_b_c_prompts_untouched():
     from triage.freeze import mismatches
     assert mismatches() == []
+
+
+def test_every_config_is_listed_once_and_everyone_uses_that_list():
+    # One source of truth for config names, so a new config cannot be missed in one file.
+    from triage import agent, freeze, report, run
+    assert set(agent.PROMPTS) == set(agent.MAIN_CONFIGS) | set(agent.EXPLORATORY_CONFIGS)
+    assert not set(agent.MAIN_CONFIGS) & set(agent.EXPLORATORY_CONFIGS)
+    for module in (run, freeze, report):
+        assert module.CONFIGS is agent.MAIN_CONFIGS, module.__name__
