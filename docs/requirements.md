@@ -38,7 +38,8 @@ From the approved semester proposal (EE 672, "Trustworthy Agentic AI for Securit
 | Unsupported recommendations | ADR 0006, `score.py` |
 | Inappropriate tool use | unauthorized attempts vs. executed |
 | Per-alert cost | tokens and seconds per run; $0 with the local model (ADR 0004) |
-| Usefulness loss | abstention 2x2 (`abstained_when_could_answer`) |
+| Usefulness loss | abstention 2x2 (`abstained_when_could_answer`); useful-answer rate, at most 10 points below B (ADR 0011, "B vs C" in `summary.md`) |
+| Comparing B and C (experimental rigor) | 95% bootstrap intervals and exact McNemar tests (`report.intervals`, `report.compare`) |
 | One family end to end first | suspicious_auth AUTH-001..004 |
 | Model choice | ADR 0004, ADR 0007 |
 | Appropriate abstention (withheld variants) | ADR 0008 |

@@ -1,6 +1,8 @@
 """Seam 3: the triage.run command line. Uses the scripted model: no network."""
 import json
 
+import pytest
+
 from triage import run
 from triage.agent import OllamaModel
 
@@ -123,6 +125,20 @@ def test_resume_reruns_a_logged_run_that_has_no_score(tmp_path):
     key = lambda r: (r["case_id"], r["variant"], r["config"])
     assert sum(key(l) == key(lost) for l in lines(out / "logs.jsonl")) == 1
     assert sum(key(s) == key(lost) for s in lines(out / "scores.jsonl")) == 1
+
+
+def test_resume_redoes_a_run_whose_last_line_was_cut_off(tmp_path):
+    # Colab disconnects while a line is being written: the file ends in half a line.
+    out = tmp_path / "t"
+    run.main(["--dry-run", "--out", str(out)])
+    p = out / "scores.jsonl"
+    rows = p.read_text().splitlines()
+    p.write_text("\n".join(rows[:-1]) + "\n" + rows[-1][: len(rows[-1]) // 2])
+
+    with pytest.warns(UserWarning, match="half-written"):
+        run.main(["--dry-run", "--out", str(out)])
+
+    assert len(lines(out / "logs.jsonl")) == 9 and len(lines(out / "scores.jsonl")) == 9
 
 
 def test_resume_keeps_a_model_that_ran_out_of_budget(tmp_path):
