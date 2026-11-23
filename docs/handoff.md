@@ -1,10 +1,10 @@
 # Handoff: agentic-alert-triage (EE 672)
 
-Updated 2026-11-23 (Phase 1 step 5 in progress: McNemar merged, confidence intervals in review).
+Updated 2026-11-23 (Phase 1 step 5 done, in review: B vs C statistics in `summary.md`).
 
 ## Where things stand
 - Repo `blackvectra/agentic-alert-triage`, branch `mlev/beautiful-bardeen-qdvis3`. Run `git log` and `git status -sb` for the current commit and whether it is pushed; this note is updated when a Phase 1 step finishes, not for every commit.
-- Open PRs: list them on GitHub. Merged so far this phase: #19 (dev-run fixes), #20 and #21 (notebook code source, README run options), #22 (abstention rate and coverage), #23 (ADR 0011 usefulness threshold), #24 (McNemar test).
+- Open PRs: list them on GitHub. Merged so far this phase: #19 (dev-run fixes), #20 and #21 (notebook code source, README run options), #22 (abstention rate and coverage), #23 (ADR 0011 usefulness threshold), #24 (McNemar test), #25 (bootstrap confidence intervals).
 - **Dev runs 1 and 2** ran on code from before the ADR 0010 fixes (`b33f72b`): one on an L4 (a rehearsal, not data to report) and one on the A100. Both showed the four problems ADR 0010 fixes: config A answers inside code blocks, B and C stopping after one tool call, C citing the alert id, and `host` arguments to `event_search`.
 - **Dev run 3** ran on the fixed code (A100, qwen3:32b, think off, temperature 0, seed 672, num_ctx 16384, answer parser v3). Prompt fingerprints A `bb54cbf1fa`, B `3869b48d2d`, C `eb6930100f`. The results zip is not in the repo; the user has it.
   - 108 runs, no harness errors, every answer valid. B made 118 tool calls and C 116, so B and C now investigate.
@@ -51,9 +51,7 @@ Phase 1 (the EE 672 submission). When a step finishes, update this list and "Whe
 2. Done: dev run 3, scored above.
 3. Done: abstention rate, coverage and selective accuracy in the report (#22).
 4. Done: ADR 0011, C's useful-answer rate at most 10 points below B's (#23).
-5. **In progress:** statistics.
-   - Done: `report.mcnemar` (#24) and `report.bootstrap_ci` with `useful_answer_rate` and `useful_answer_drop`.
-   - To do: put both in `summary.md`, with ADR 0011's pass, fail or inconclusive call.
+5. Done (in review): statistics. `summary.md` has a "Confidence intervals" table (95% bootstrap interval per config for accuracy, useful-answer rate, unauthorized-executed rate and injection success) and a "B vs C" section: the useful-answer drop with its interval and ADR 0011's pass, fail or inconclusive call, then McNemar tests on correct answers, unauthorized calls executed and injection success. `intervals.csv` and `b_vs_c.csv` hold the same numbers. On dev run 3: inconclusive; McNemar p 0.125 (correct), 0.031 (executed, the 6 `host` calls), 1.0 (injection).
 6. Freeze the prompts and fixtures before any held-out run. Every prompt change tunes the prompts to the 12 dev cases.
 7. Held-out run: 3 configs × 30 cases × 3 variants = 270 runs, on the same GPU type.
 8. Write the report in plain, human wording. It must cover:
