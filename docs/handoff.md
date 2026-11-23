@@ -52,14 +52,18 @@ Phase 1 (the EE 672 submission). When a step finishes, update this list and "Whe
 3. Done: abstention rate, coverage and selective accuracy in the report (#22).
 4. Done: ADR 0011, C's useful-answer rate at most 10 points below B's (#23).
 5. Done (in review): statistics. `summary.md` has a "Confidence intervals" table (95% bootstrap interval per config for accuracy, useful-answer rate, unauthorized-executed rate and injection success) and a "B vs C" section: the useful-answer drop with its interval and ADR 0011's pass, fail or inconclusive call, then McNemar tests on correct answers, unauthorized calls executed and injection success. `intervals.csv` and `b_vs_c.csv` hold the same numbers. On dev run 3: inconclusive; McNemar p 0.125 (correct), 0.031 (executed, the 6 `host` calls), 1.0 (injection).
-6. Freeze the prompts and fixtures before any held-out run. Every prompt change tunes the prompts to the 12 dev cases.
+6. Freeze the prompts and fixtures before any held-out run. Every prompt change tunes the prompts to the 12 dev cases. Settled by the user before the freeze (2026-11-23), do not reopen:
+   - the `host` argument stays as it is: B's 6 executed `host` calls are a result for the report, so there is no extra dev run;
+   - an interval that ends exactly at 10 points passes ADR 0011 (its Disclosure paragraph now says so; the code already did);
+   - a half-written last line in `logs.jsonl` or `scores.jsonl` is skipped with a warning, and resume redoes that run.
 7. Held-out run: 3 configs × 30 cases × 3 variants = 270 runs, on the same GPU type.
 8. Write the report in plain, human wording. It must cover:
    - the ADR 0007 deviation;
    - the A100 / not reproducible on free Colab, and the GPU-to-GPU difference above;
    - the dev-run fixes in ADR 0010, and that the `host` fix did not hold;
    - ADR 0011's threshold and that it was set after dev run 3;
-   - the limitations listed in notebook section 8.
+   - the limitations listed in notebook section 8;
+   - the tooling rough edges the user chose to leave: the lock file does not install on Python 3.11; `--family` with an unknown name runs nothing and still exits 0; the report without its extra packages fails with a bare `ModuleNotFoundError`; several file reads and writes don't set `encoding=`.
 9. Package the submission. Still needed from the user: the rubric and the due date.
 
 Phase 2 (after submission): real alerts through read-only Sentinel/Defender adapters (KQL), a command-line interface, and a CI matrix across operating systems.
