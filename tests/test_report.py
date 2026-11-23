@@ -284,7 +284,7 @@ def test_bootstrap_ci_resamples_whole_cases_and_is_reproducible():
     ((0.0, 0.05), "pass"),
     ((0.0, 0.1), "pass"),                     # the whole interval is at most 10 points
     ((0.0, 0.1 + 1e-12), "pass"),             # float noise on an exact 6/60 does not move the line
-    ((0.05, 0.25), "inconclusive"),           # the interval contains the 10-point line
+    ((0.05, 0.25), "inconclusive"),           # the interval crosses the 10-point line
     ((0.1 + 1e-6, 0.3), "fail"),
     (None, "not computed"),
 ])
