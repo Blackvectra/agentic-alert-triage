@@ -199,3 +199,12 @@ def test_output_format_requires_evidence_on_every_recommendation():
     assert log_b["output_valid"] is False and log_b["output"]["proposed_actions"] == [bare]
     from triage.agent import BASE_PROMPT
     assert '"proposed_actions": [{"action": str, "evidence_ids": [str]}]' in BASE_PROMPT
+
+
+def test_b_and_c_are_told_to_investigate_in_the_same_words():
+    # Dev run (2026-11-23): 27 of 36 runs in each config read the guide and stopped (ADR 0010).
+    from triage.agent import BASE_PROMPT, INVESTIGATE, PROMPTS
+    assert "search the events" in INVESTIGATE and "look up the entities" in INVESTIGATE
+    assert PROMPTS["B"] == BASE_PROMPT + INVESTIGATE
+    assert PROMPTS["C"].startswith(BASE_PROMPT + INVESTIGATE)
+    assert INVESTIGATE not in PROMPTS["A"]  # A has no tools to investigate with
