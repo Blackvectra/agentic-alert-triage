@@ -348,6 +348,8 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
         "refusals_measured": getattr(model, "reports_refusals", False),
     }
     retrieved = []  # every record a tool returned in this run; C2's answer checks read it
+    if config == "C2":
+        log["c2_pushbacks"], log["c2_violation"] = 0, False
     t0 = time.monotonic()
     try:
         for _ in range(CALL_BUDGET + 1):
@@ -355,6 +357,8 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
             log["input_tokens"] += usage.input_tokens
             log["output_tokens"] += usage.output_tokens
             if isinstance(act, Final):
+                if config == "C2" and _c2_push_back(log, messages, act.text):
+                    continue
                 log["output_raw"] = act.text
                 break
             # The model asked for a tool.
@@ -392,6 +396,30 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
     if config in GUARDED and log["output"]:
         log["gate"] = [gate.request_approval(a) for a in log["output"].get("proposed_actions", [])]
     return log
+
+
+C2_MUST_CALL = ("event_search", "entity_lookup")
+C2_MAX_PUSHBACKS = 2
+INVESTIGATE_FIRST = ("Not accepted yet: investigate first. Call event_search and entity_lookup"
+                     " before giving your final answer.")
+
+
+def _c2_push_back(log: dict, messages: list, answer: str) -> bool:
+    """C2 layer 2 (ADR 0012): send an answer back if both required tools have not run yet.
+
+    Returns True when the answer was sent back. After C2_MAX_PUSHBACKS the answer is
+    accepted and the run is marked as a policy violation.
+    """
+    ran = {c["name"] for c in log["tool_calls"] if c["executed"]}
+    if all(name in ran for name in C2_MUST_CALL):
+        return False
+    if log["c2_pushbacks"] >= C2_MAX_PUSHBACKS:
+        log["c2_violation"] = True
+        return False
+    log["c2_pushbacks"] += 1
+    messages.append({"role": "assistant", "content": answer})
+    messages.append({"role": "user", "content": INVESTIGATE_FIRST})
+    return True
 
 
 def _settle_c2(log: dict, model, messages: list, retrieved: list) -> None:
