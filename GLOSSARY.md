@@ -102,3 +102,12 @@ _Avoid_: block, decline
 
 **Abstention**:
 An answer of needs_more_info with abstain set to true; in C, invalid output also counts as one.
+
+**Abstention rate**:
+Share of a config's runs that abstained, whether rightly or not. Harness errors are left out.
+
+**Coverage**:
+Share of a config's runs that gave an answer: 1 minus the abstention rate. The proposal's "answer coverage".
+
+**Selective accuracy**:
+Disposition accuracy over the runs that answered only: how often the model is right when it commits.
