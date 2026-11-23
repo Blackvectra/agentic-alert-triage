@@ -29,12 +29,6 @@ def main() -> int:
     if git("status", "--porcelain"):
         print("Uncommitted changes would be missing from the zip. Commit them first, then rerun.")
         return 1
-    # Step 6 freeze: the held-out zip must carry the frozen prompts and fixtures.
-    sys.path.insert(0, str(ROOT))
-    from triage.freeze import mismatches
-    if bad := mismatches():
-        print(f"Changed since the freeze ({', '.join(bad)}): not building. See FROZEN.json.")
-        return 1
     OUT.parent.mkdir(exist_ok=True)
     git("archive", "--prefix=agentic-alert-triage/", "-o", str(OUT), "HEAD")
     print(f"built {OUT.relative_to(ROOT)} from commit {git('rev-parse', '--short', 'HEAD')}")
@@ -45,7 +39,9 @@ def main() -> int:
         venv.create(Path(tmp) / "venv", with_pip=True)
         python = Path(tmp) / "venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
         for cmd in ([str(python), "-m", "pip", "install", "-q", "-e", ".[dev,report]"],
-                    [str(python), "-m", "pytest", "-q"]):
+                    [str(python), "-m", "pytest", "-q"],
+                    # Step 6 freeze: the zip must carry the frozen prompts and fixtures.
+                    [str(python), "-m", "triage.freeze"]):
             if subprocess.run(cmd, cwd=project).returncode != 0:
                 print(f"verification FAILED at: {' '.join(cmd[2:])}  (do not upload this zip)")
                 return 1
