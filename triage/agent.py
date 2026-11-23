@@ -26,8 +26,9 @@ CALL_BUDGET = 8  # identical for B and C so the comparison is fair
 
 # Raise this by one whenever _parse_output reads an answer differently. It is logged with every
 # run, and resume reruns any run made with another number, because a saved answer that was read
-# the old way would otherwise be mixed with new ones (ADR 0010). 2 = removes a code block.
-ANSWER_PARSER_VERSION = 2
+# the old way would otherwise be mixed with new ones (ADR 0010).
+# 2 = removes a ```json code block; 3 = also one-line, ~~~ and longer fences.
+ANSWER_PARSER_VERSION = 3
 
 OUTPUT_SCHEMA = {
     "type": "object",
@@ -375,14 +376,18 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
 
 
 def _strip_code_fence(raw: str) -> str:
-    """Remove a Markdown code block (```json ... ```) wrapped around the whole answer.
+    """Remove a Markdown code block (```json ... ``` or ~~~ ... ~~~) wrapped around the whole answer.
 
     The fence is formatting, not part of the answer, and it is removed the same way for
     A, B and C (ADR 0010). Text before or after the block is left alone, so an answer
     with extra prose around it still counts as invalid.
     """
-    fenced = re.fullmatch(r"```[A-Za-z]*\s*\n(.*?)\s*```", raw.strip(), flags=re.DOTALL)
-    return fenced.group(1) if fenced else raw
+    # The same run of three or more backticks or tildes must open and close the answer.
+    fenced = re.fullmatch(r"(`{3,}|~{3,})(.*)\1", raw.strip(), flags=re.DOTALL)
+    if not fenced:
+        return raw
+    # Drop a language tag such as "json" when one follows the opening fence.
+    return re.sub(r"^[A-Za-z][\w+-]*(?=\s)", "", fenced.group(2))
 
 
 def _parse_output(log: dict, config: str) -> None:
