@@ -37,11 +37,20 @@ tests/                      fixture integrity, scorer, adapters, CLI and report 
 
 **Colab (recommended):** upload `notebooks/agentic_triage.ipynb` to Colab and, when asked, the project zip, built and verified with `python scripts/make_colab_zip.py` (writes `dist/agentic-alert-triage.zip`); no GitHub needed. Then set `MODEL` and `RUN` in the first code cell, and Run all. For the real model (qwen3:32b) choose Runtime → Change runtime type → A100 GPU, which needs Colab Pro. No API key is used.
 
+Ways to run the notebook (pick one; the default needs no change):
+
+| Where | Setting in section 0 | How the code gets in |
+|---|---|---|
+| Colab in a browser (default) | `CODE_FROM = "upload"` | choose the project zip in the upload box |
+| VS Code or another editor connected to a Colab runtime | `CODE_FROM = "github"` | the Colab machine clones this repo (`GITHUB_BRANCH`, default `main`); the upload box only works in a browser |
+| Your own machine (Jupyter or VS Code, any OS) | nothing | uses your local checkout; the Colab setup is skipped |
+
 **Locally:**
 
 ```
 python -m venv .venv
 .venv\Scripts\activate            # Windows
+source .venv/bin/activate          # macOS / Linux
 pip install -e ".[dev,report]"     # or: pip install -r requirements.lock && pip install -e . --no-deps
 python scripts/check.py           # fresh venv + every test, same as CI
 python -m triage.run --dry-run                                   # scripted model, no GPU
