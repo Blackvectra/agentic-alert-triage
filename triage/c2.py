@@ -56,3 +56,35 @@ def answer_problems(answer: dict, retrieved_ids: set[str], records: list[dict] =
         for eid, meaning in known_bad_indicators(list(records)):
             problems.append(f"answered benign, but {eid} shows a known-bad sign: {meaning}")
     return problems
+
+
+# What a failed answer becomes after its one repair turn: abstain and propose nothing. The code
+# never sets true_positive itself, so the verdict always comes from the model (ADR 0012).
+FALLBACK = {
+    "disposition": "needs_more_info", "abstain": True,
+    "summary": "Answer withheld: it failed C2's answer checks twice.",
+    "claims": [], "proposed_actions": [],
+}
+INVALID = "the answer was not valid JSON in the required format"
+
+
+def settle_answer(answer, ask_again, retrieved_ids: set[str], records: list[dict] = ()):
+    """Check an answer, allow one repair turn, and fall back to needs_more_info.
+
+    answer is the parsed answer, or None when it was not valid. ask_again(feedback) asks the
+    model to fix its answer and returns the new parsed answer (or None). Returns the answer to
+    keep and a record of what happened, for the log.
+    """
+    def problems(a):
+        return [INVALID] if a is None else answer_problems(a, retrieved_ids, records)
+
+    first = problems(answer)
+    if not first:
+        return answer, {"outcome": "accepted", "problems": []}
+    feedback = ("Your answer was not accepted:\n- " + "\n- ".join(first)
+                + "\nFix these and reply with the corrected JSON answer only.")
+    repaired = ask_again(feedback)
+    second = problems(repaired)
+    if not second:
+        return repaired, {"outcome": "repaired", "problems": [first]}
+    return dict(FALLBACK), {"outcome": "fallback", "problems": [first, second]}

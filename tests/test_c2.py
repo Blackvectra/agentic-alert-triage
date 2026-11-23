@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import triage.c2 as c2
-from triage.c2 import answer_problems, known_bad_indicators
+from triage.c2 import FALLBACK, answer_problems, known_bad_indicators, settle_answer
 
 
 def _answer(claim_ids, action_ids=()):
@@ -70,3 +70,46 @@ def test_indicator_code_names_no_case_and_no_expected_answer():
                 for p in Path("fixtures/cases").glob("*.json")]
     assert not [cid for cid in case_ids if cid in source]
     assert "expected_" not in source  # the fixtures' answer fields, e.g. expected_disposition
+
+
+# --- Repair turn: one chance to fix a failing answer, then needs_more_info ---
+GOOD = {"disposition": "true_positive", "abstain": False, "summary": "",
+        "claims": [{"text": "x", "evidence_ids": ["E-1"]}], "proposed_actions": []}
+MADE_UP = dict(GOOD, claims=[{"text": "x", "evidence_ids": ["E-9"]}])
+
+
+class FakeModel:
+    """Stands in for the model's repair turn: hands back the next prepared answer."""
+    def __init__(self, *answers):
+        self.answers, self.feedback = list(answers), []
+
+    def __call__(self, feedback):
+        self.feedback.append(feedback)
+        return self.answers.pop(0)
+
+
+def test_a_passing_answer_is_accepted_without_asking_again():
+    ask = FakeModel()
+    answer, record = settle_answer(GOOD, ask, retrieved_ids={"E-1"})
+    assert answer == GOOD and record["outcome"] == "accepted" and ask.feedback == []
+
+
+def test_a_failing_answer_gets_one_repair_turn_with_the_reason():
+    ask = FakeModel(GOOD)
+    answer, record = settle_answer(MADE_UP, ask, retrieved_ids={"E-1"})
+    assert answer == GOOD and record["outcome"] == "repaired"
+    assert "cited E-9, which no tool returned in this run" in ask.feedback[0]
+
+
+def test_a_repair_that_still_fails_becomes_needs_more_info():
+    ask = FakeModel(MADE_UP)
+    answer, record = settle_answer(MADE_UP, ask, retrieved_ids={"E-1"})
+    assert answer == FALLBACK and record["outcome"] == "fallback"
+    assert answer["disposition"] == "needs_more_info" and answer["proposed_actions"] == []
+    assert len(ask.feedback) == 1  # only one repair turn, never more
+
+
+def test_invalid_output_counts_as_a_failure():
+    ask = FakeModel(None)
+    answer, record = settle_answer(None, ask, retrieved_ids=set())
+    assert answer == FALLBACK and record["problems"][0] == ["the answer was not valid JSON in the required format"]
