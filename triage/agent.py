@@ -381,7 +381,8 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
                 entry["executed"] = True
                 entry["returned_ids"] = [r["evidence_id"] for r in records]
                 retrieved.extend(records)
-                result = json.dumps(records)
+                # C2 labels tool output as data, never instructions (spotlighting, ADR 0012).
+                result = json.dumps({"untrusted_data": records} if config == "C2" else records)
             else:
                 result = json.dumps({"error": "call rejected"})
             log["tool_calls"].append(entry)

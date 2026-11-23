@@ -124,3 +124,22 @@ def test_a_rejected_call_does_not_count_as_investigating():
     bad = ToolCall("entity_lookup", {"id": "x" * 500})  # too long: rejected, never runs
     log = _run([SEARCH, bad, _final([]), LOOKUP, _final([])])
     assert log["c2_pushbacks"] == 1
+
+
+# --- Layer 1: tool output reaches C2's model labelled as untrusted data (ADR 0012) ---
+def _tool_messages(config):
+    model = CountingModel([SEARCH, LOOKUP, _final(["E-EVT-001"])])
+    run_case(CASE, "complete", config, model, build_view(CASE, "complete"))
+    return [json.loads(m["content"]) for m in model.seen if m["role"] == "tool"]
+
+
+def test_c2_sees_tool_results_wrapped_as_untrusted_data():
+    first = _tool_messages("C2")[0]
+    assert list(first) == ["untrusted_data"]
+    assert "E-EVT-001" in [r["evidence_id"] for r in first["untrusted_data"]]
+
+
+def test_b_and_c_still_see_plain_tool_results():
+    for config in ("B", "C"):
+        first = _tool_messages(config)[0]
+        assert isinstance(first, list) and "E-EVT-001" in [r["evidence_id"] for r in first]
