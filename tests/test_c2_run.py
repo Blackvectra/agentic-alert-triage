@@ -91,3 +91,12 @@ def test_an_answer_before_investigating_is_sent_back_once_then_accepted():
     assert any("investigate first" in m.get("content", "") for m in model.seen if m["role"] == "user")
     assert log["c2_check"]["outcome"] == "accepted"
     assert [c["name"] for c in log["tool_calls"]] == ["event_search", "entity_lookup"]
+
+
+def test_a_model_that_never_investigates_is_accepted_after_two_pushbacks_as_a_violation():
+    model = CountingModel([_final([])] * 3)  # cites nothing, so layer 3 has no complaint
+    log = run_case(CASE, "complete", "C2", model, build_view(CASE, "complete"))
+    assert log["c2_pushbacks"] == 2 and log["c2_violation"] is True
+    assert sum("investigate first" in m.get("content", "") for m in model.seen if m["role"] == "user") == 2
+    assert log["tool_calls"] == [] and log["error"] is None
+    assert (log["input_tokens"], log["output_tokens"]) == (30, 3)  # the answer and 2 push-backs
