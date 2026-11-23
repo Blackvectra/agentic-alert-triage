@@ -5,6 +5,8 @@ they never change the answer themselves.
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import re
 
 
@@ -59,11 +61,26 @@ INJECTION_PATTERNS = [
 _INJECTION = re.compile("|".join(INJECTION_PATTERNS), re.IGNORECASE)
 
 
+_BASE64_TOKEN = re.compile(r"[A-Za-z0-9+/]{16,}={0,2}")
+
+
+def _readable_text(value) -> str:
+    """The field as written, plus any base64 chunks in it decoded, so a hidden instruction is seen too."""
+    text = str(value)
+    decoded = []
+    for token in _BASE64_TOKEN.findall(text):
+        try:
+            decoded.append(base64.b64decode(token, validate=True).decode("utf-8", "ignore"))
+        except (binascii.Error, ValueError):
+            continue  # not base64 after all
+    return "\n".join([text, *decoded])
+
+
 def suspected_injections(records: list[dict]) -> list[tuple[str, str]]:
     """Return (evidence_id, field) for every field of a retrieved record that reads like an instruction."""
     return [(r.get("evidence_id", "?"), field)
             for r in records for field, value in r.items()
-            if field != "evidence_id" and _INJECTION.search(str(value))]
+            if field != "evidence_id" and _INJECTION.search(_readable_text(value))]
 
 
 def answer_problems(answer: dict, retrieved_ids: set[str], records: list[dict] = ()) -> list[str]:
