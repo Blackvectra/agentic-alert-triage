@@ -1,4 +1,4 @@
-"""The one check, used both locally and in CI: fresh venv, install, run every test.
+"""The one check, used both locally and in CI: fresh venv, install, lint, run every test.
 
     python scripts/check.py
 
@@ -28,6 +28,7 @@ def main() -> int:
 
     steps = [
         [str(python), "-m", "pip", "install", "-q", "-e", INSTALL],
+        [str(python), "-m", "ruff", "check", "."],  # lint first: fast, and catches leftovers
         [str(python), "-m", "pytest", "-q"],
     ]
     for cmd in steps:
