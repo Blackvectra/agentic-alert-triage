@@ -11,4 +11,4 @@ After a PR merges (squash or merge commit), run `scripts/resync_after_merge.sh`;
 - B and C keep identical tools and call budget (ADR 0001).
 - API keys come from environment variables only; never in code, logs or commits.
 - The user is learning Python: before each change, say what and why in plain words; one small commit, then stop for review, unless the user asks for a batch (then keep commits small and review together at the end).
-- Commits are authored by Blackvectra on purpose, with the session's signed committer so GitHub shows Verified (command in docs/handoff.md); never `--reset-author`; push only when the user asks.
+- Commits are authored by Blackvectra on purpose, with the session's signed committer so GitHub shows Verified (command in docs/handoff.md); never `--reset-author`; push each commit to the working branch once `check.py` passes; merge only when the user asks.
