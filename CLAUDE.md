@@ -4,7 +4,7 @@ Read docs/handoff.md first: it says where things stand and what is next.
 Read GLOSSARY.md for project terms and docs/adr/ before changing triage/.
 Check changes against docs/requirements.md (assignment, instructor feedback, proposal).
 Run `python scripts/check.py` before committing; CI runs the same check.
-After a squash merge, run `scripts/resync_after_merge.sh`; to finalize a draft case, `scripts/finalize_case.py`.
+After a PR merges (squash or merge commit), run `scripts/resync_after_merge.sh`; to finalize a draft case, `scripts/finalize_case.py`.
 
 - Read-only and simulated: tools never write; the approval gate never executes.
 - Scoring rules (triage/score.py) and each case's expected answers are the user's ground truth: ask before changing them.
