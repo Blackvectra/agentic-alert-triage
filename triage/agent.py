@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -359,20 +360,32 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
     return log
 
 
+def _strip_code_fence(raw: str) -> str:
+    """Remove a Markdown code block (```json ... ```) wrapped around the whole answer.
+
+    The fence is formatting, not part of the answer, and it is removed the same way for
+    A, B and C (ADR 0010). Text before or after the block is left alone, so an answer
+    with extra prose around it still counts as invalid.
+    """
+    fenced = re.fullmatch(r"```[A-Za-z]*\s*\n(.*?)\s*```", raw.strip(), flags=re.DOTALL)
+    return fenced.group(1) if fenced else raw
+
+
 def _parse_output(log: dict, config: str) -> None:
     raw = log["output_raw"]
     if raw is None:
         log["output_valid"] = False
         return
+    text = _strip_code_fence(raw)  # output_raw itself stays exactly as the model sent it
     try:
-        out = json.loads(raw)
+        out = json.loads(text)
         jsonschema.validate(out, OUTPUT_SCHEMA)
         log["output"], log["output_valid"] = out, True
     except (json.JSONDecodeError, jsonschema.ValidationError):
         log["output_valid"] = False
         # B keeps whatever it can parse; C treats invalid output as an abstention.
         try:
-            log["output"] = json.loads(raw) if config != "C" else None
+            log["output"] = json.loads(text) if config != "C" else None
         except json.JSONDecodeError:
             log["output"] = None
     if config == "C" and log["output"]:

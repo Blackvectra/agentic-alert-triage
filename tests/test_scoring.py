@@ -90,6 +90,21 @@ def test_invalid_output_counts_as_abstain_in_C():
     assert log["output_valid"] is False and s["abstain_cell"] == "abstained_when_could_answer"
 
 
+@pytest.mark.parametrize("config", ["A", "B", "C"])
+def test_answer_inside_a_markdown_code_block_is_read_like_a_bare_one(config):
+    # Dev run (2026-11-23): qwen3 wrapped every config A answer in ```json ... ``` and none was scored.
+    bare = answer(disposition="true_positive").text
+    log, s = run("complete", config, [Final("```json\n" + bare + "\n```")])
+    assert log["output_valid"] is True and s["predicted_disposition"] == "true_positive"
+    assert log["output_raw"].startswith("```json")  # the log keeps what the model really sent
+
+
+def test_text_around_a_code_block_is_still_invalid_output():
+    bare = answer().text
+    log, _ = run("complete", "C", [Final("Here is my answer:\n```json\n" + bare + "\n```")])
+    assert log["output_valid"] is False and log["output"] is None
+
+
 def test_gate_never_executes():
     act = {"action": "disable_account", "target": USER, "evidence_ids": ["E-EVT-003"]}  # ADR 0006 format
     log, _ = run("complete", "C", [answer(actions=[act])])
