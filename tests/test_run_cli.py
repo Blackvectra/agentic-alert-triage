@@ -239,3 +239,17 @@ def test_run_warns_when_harness_errors_remain(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(run, "demo_model", broken)
     run.main(["--dry-run", "--out", str(tmp_path / "x")])
     assert "9 harness errors; rerun the same --out to retry" in capsys.readouterr().out
+
+
+def test_a_default_run_plans_a_b_and_c_only(tmp_path):
+    run.main(["--dry-run", "--out", str(tmp_path / "d")])
+    assert {l["config"] for l in lines(tmp_path / "d" / "logs.jsonl")} == {"A", "B", "C"}
+
+
+def test_configs_c2_runs_c2_only_and_a_later_default_run_keeps_it(tmp_path):
+    out = tmp_path / "d"
+    run.main(["--dry-run", "--configs", "C2", "--out", str(out)])
+    assert {l["config"] for l in lines(out / "logs.jsonl")} == {"C2"}
+    run.main(["--dry-run", "--out", str(out)])  # resuming must not delete the C2 runs
+    configs = [l["config"] for l in lines(out / "logs.jsonl")]
+    assert configs.count("C2") == 3 and len(configs) == 12
