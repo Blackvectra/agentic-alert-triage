@@ -208,3 +208,17 @@ def test_b_and_c_are_told_to_investigate_in_the_same_words():
     assert PROMPTS["B"] == BASE_PROMPT + INVESTIGATE
     assert PROMPTS["C"].startswith(BASE_PROMPT + INVESTIGATE)
     assert INVESTIGATE not in PROMPTS["A"]  # A has no tools to investigate with
+
+
+def test_c_is_told_the_alert_id_is_not_evidence():
+    # Dev run (2026-11-23): 24 of 36 C runs cited the alert's own id, e.g. ALR-10612 (ADR 0010).
+    from triage.agent import PROMPTS
+    assert "alert_id is not an evidence_id" in PROMPTS["C"]
+
+
+def test_citing_the_alert_id_is_still_scored_as_fabricated():
+    # The prompt changed, the rule did not: only ids a tool returned in this run count.
+    alert_id = CASE["alert"]["alert_id"]
+    _, s = run("complete", "C", [ToolCall("event_search", {"user": USER}),
+                                 answer(claims=[{"text": "the alert fired", "evidence_ids": [alert_id]}])])
+    assert s["fabricated_citations"] == [alert_id] and s["supported_claim_rate"] == 0.0
