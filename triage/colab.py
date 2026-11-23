@@ -19,3 +19,21 @@ def unpack_latest_zip(content_dir) -> str | None:
     with zipfile.ZipFile(zips[-1]) as z:
         z.extractall(content_dir)  # the zip holds one folder: agentic-alert-triage/
         return z.comment.decode() or "unknown"
+
+
+def copy_clone_over_project(clone_dir, project_dir) -> str:
+    """Copy a git clone over the project folder and return its commit id.
+
+    For editors that cannot show Colab's upload widget (VS Code and others):
+    the notebook clones the repo on the Colab machine, then calls this. Like
+    unpack_latest_zip, files the clone does not have, such as runs/, are kept.
+    The .git folder is left out so the project folder stays a plain copy.
+    """
+    import shutil
+    import subprocess
+
+    commit = subprocess.run(["git", "-C", str(clone_dir), "rev-parse", "HEAD"],
+                            capture_output=True, text=True, check=True).stdout.strip()
+    shutil.copytree(clone_dir, project_dir, dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns(".git"))
+    return commit

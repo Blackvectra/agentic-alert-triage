@@ -30,3 +30,28 @@ def test_newest_zip_replaces_old_code_and_keeps_results(tmp_path):
 
 def test_no_zip_returns_none(tmp_path):
     assert unpack_latest_zip(tmp_path) is None
+
+
+def test_clone_replaces_old_code_keeps_results_and_reports_commit(tmp_path):
+    import subprocess
+
+    from triage.colab import copy_clone_over_project
+
+    clone = tmp_path / "clone"
+    clone.mkdir()
+    (clone / "code.py").write_text("new")
+    git = ["git", "-C", str(clone), "-c", "user.name=t", "-c", "user.email=t@example.com"]
+    subprocess.run(git[:3] + ["init", "-q"], check=True)
+    subprocess.run(git + ["add", "."], check=True)
+    subprocess.run(git + ["commit", "-q", "-m", "x"], check=True)
+    head = subprocess.run(git[:3] + ["rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+
+    project = tmp_path / "agentic-alert-triage"
+    (project / "runs").mkdir(parents=True)
+    (project / "code.py").write_text("old")
+    (project / "runs" / "logs.jsonl").write_text("results")
+
+    assert copy_clone_over_project(clone, project) == head
+    assert (project / "code.py").read_text() == "new"
+    assert (project / "runs" / "logs.jsonl").read_text() == "results"   # earlier runs survive
+    assert not (project / ".git").exists()

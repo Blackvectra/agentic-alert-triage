@@ -50,6 +50,19 @@ def test_progress_counts_runs_an_earlier_session_already_did(tmp_path, capsys):
     assert capsys.readouterr().out.splitlines()[0].startswith("[9/9] AUTH-001 injected  C")
 
 
+def test_time_left_on_a_resumed_run_counts_only_the_runs_still_to_do(tmp_path, capsys):
+    out_dir = tmp_path / "dry"
+    run.main(["--dry-run", "--out", str(out_dir)])
+    logs = lines(out_dir / "logs.jsonl")
+    logs[0]["error"] = "URLError: timed out"   # the very first run failed; the eight after it are fine
+    _rewrite(out_dir / "logs.jsonl", logs)
+    capsys.readouterr()
+    run.main(["--dry-run", "--out", str(out_dir)])
+    first = capsys.readouterr().out.splitlines()[0]
+    # One run to redo: it is the 9th to finish and nothing is left after it.
+    assert first.startswith("[9/9] AUTH-001 complete  A") and "min left" not in first
+
+
 def test_time_left_uses_the_typical_run_not_the_slow_first_one():
     logs = [{"latency_s": 600.0}, {"latency_s": 60.0}, {"latency_s": 60.0}]
     assert run._time_left(logs, 10) == "  about 10 min left"
@@ -167,6 +180,26 @@ def test_resume_reruns_runs_made_with_different_prompts_or_tools(tmp_path):
     again = lines(out / "logs.jsonl")
     assert len(again) == 9 and len(lines(out / "scores.jsonl")) == 9
     assert all(l["prompt_sha256"] != "0" * 64 for l in again)
+
+
+def test_resume_reruns_runs_read_by_an_older_answer_parser(tmp_path, capsys):
+    # Dev run (2026-11-23): config A's prompt did not change when the parser learned to read
+    # code blocks, so its 36 old "no answer" rows would have been kept on resume (ADR 0010).
+    out = tmp_path / "oldparser"
+    run.main(["--dry-run", "--out", str(out)])
+    logs = lines(out / "logs.jsonl")
+    for l in logs:
+        if l["config"] == "A":
+            l.pop("answer_parser", None)   # as written by code from before the version was logged
+    _rewrite(out / "logs.jsonl", logs)
+    capsys.readouterr()
+
+    run.main(["--dry-run", "--out", str(out)])
+
+    assert "3 new runs, 6 already done" in capsys.readouterr().out
+    again = lines(out / "logs.jsonl")
+    assert len(again) == 9 and len(lines(out / "scores.jsonl")) == 9
+    assert all("answer_parser" in l for l in again)
 
 
 def test_model_name_typo_fails_fast_with_the_valid_forms():
