@@ -205,3 +205,17 @@ def test_correct_by_variant_counts_correct_abstentions_and_drops_harness_errors(
     assert acc.loc["complete", "C"] == pytest.approx(0.0)
     assert acc.loc["withheld", "B"] == pytest.approx(1.0)
     assert list(acc.index) == ["complete", "withheld"]  # variants in the fixed order
+
+
+def test_abstention_rate_coverage_and_selective_accuracy():
+    rows = [row(config="C"),                                               # answered, right
+            row(config="C", predicted="benign"),                           # answered, wrong
+            row(config="C", expected="needs_more_info", predicted="needs_more_info",
+                abstain_cell="correct_abstain"),                           # abstained, rightly
+            row(config="C", predicted="needs_more_info",
+                abstain_cell="abstained_when_could_answer"),               # abstained, could have answered
+            row(config="C", error="HTTPError: HTTP Error 500", output_valid=False)]  # crash: left out
+    m = report.summarize(rows).loc["C"]
+    assert m["abstention_rate"] == pytest.approx(2 / 4)
+    assert m["coverage"] == pytest.approx(2 / 4)
+    assert m["selective_accuracy"] == pytest.approx(1 / 2)   # 1 right out of the 2 it answered
