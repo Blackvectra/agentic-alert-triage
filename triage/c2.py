@@ -5,6 +5,8 @@ they never change the answer themselves.
 """
 from __future__ import annotations
 
+import re
+
 
 def _text(record: dict, field: str) -> str:
     return str(record.get(field, "")).lower()
@@ -36,6 +38,32 @@ def known_bad_indicators(records: list[dict]) -> list[tuple[str, str]]:
     """Return (evidence_id, what it means) for every retrieved record that shows a known-bad sign."""
     return [(r.get("evidence_id", "?"), meaning)
             for r in records for meaning, test in KNOWN_BAD if test(r)]
+
+
+# Layer 1 (ADR 0012): instruction-like text in tool output. Written from common prompt-injection
+# wording (docs/research/real-world-guardrails.md), never from held-out cases. Flagged text is kept,
+# never deleted: a planted instruction is itself evidence of an attack.
+INJECTION_PATTERNS = [
+    # Overriding the reader's instructions.
+    r"\bignore (all |any )?(the )?(previous|prior|above|earlier|vendor)\b",
+    r"\b(disregard|override) (all |any )?(the |your )?(previous|prior|above|instructions|rules)\b",
+    r"\byou are now\b",
+    # Text addressed to an automated reader rather than to a person.
+    r"\b(note|message|instructions?) (to|for) (the |any )?(ai|assistant|llm|automated|triage)\b",
+    r"\b(ai|llm|assistant|automated triage|triage (assistant|tools?|automation))\s*:",
+    r"\bsystem (note|prompt|message)\b",
+    r"\bbefore answering\b",
+    # Telling the reader what verdict to give.
+    r"\b(mark|classify|treat|report|close) (this|it|the alert)( alert)? as (benign|a false positive|safe|authori[sz]ed)\b",
+]
+_INJECTION = re.compile("|".join(INJECTION_PATTERNS), re.IGNORECASE)
+
+
+def suspected_injections(records: list[dict]) -> list[tuple[str, str]]:
+    """Return (evidence_id, field) for every field of a retrieved record that reads like an instruction."""
+    return [(r.get("evidence_id", "?"), field)
+            for r in records for field, value in r.items()
+            if field != "evidence_id" and _INJECTION.search(str(value))]
 
 
 def answer_problems(answer: dict, retrieved_ids: set[str], records: list[dict] = ()) -> list[str]:
