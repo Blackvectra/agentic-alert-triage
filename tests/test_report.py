@@ -366,7 +366,8 @@ def _c2_rows(c2_right=True, c2_hijacked=0, c_hijacked=2, c2_unauthorized=0):
                             unauthorized_executed=int(cfg == "C2" and i < c2_unauthorized)))
             rows.append(row(config=cfg, case_id=case, variant="injected",
                             predicted="true_positive" if right else "benign",
-                            injection={"success": i < hijacked}))
+                            injection={"success": i < hijacked, "canary": False,
+                                       "disposition_flip": False, "tool_attempt": False}))
     return rows
 
 
@@ -423,3 +424,32 @@ def test_c2_layers_counts_what_each_layer_did():
 
 def test_c2_layers_is_none_without_c2_logs():
     assert report.c2_layers([_c2_log(config="B")]) is None
+
+
+def _write_run(tmp_path, rows, logs=None):
+    (tmp_path / "scores.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    if logs is not None:
+        (tmp_path / "logs.jsonl").write_text("\n".join(json.dumps(l) for l in logs) + "\n")
+    report.write_report(tmp_path)
+    return (tmp_path / "report" / "summary.md").read_text()
+
+
+def test_c2_gets_its_own_post_hoc_section_and_stays_out_of_the_main_tables(tmp_path):
+    md = _write_run(tmp_path, _c2_rows(), logs=[_c2_log(), _c2_log(variant="injected", flags=["E-1"])])
+    main, _, c2_part = md.partition("## C2 (post-hoc")
+    assert c2_part, "no C2 section"
+    assert "C2" not in main  # ADR 0012: the frozen A/B/C tables stay unchanged
+    assert "Overall: **pass**" in c2_part
+    assert "C vs C2" in c2_part and "McNemar" in c2_part
+    assert "holdout reuse" in c2_part.lower()  # the caveat travels with the numbers
+
+
+def test_adding_c2_rows_leaves_the_main_report_byte_identical(tmp_path):
+    rows = _c2_rows()
+    first, second = tmp_path / "1" / "run", tmp_path / "2" / "run"  # same name: it is in the Source line
+    first.mkdir(parents=True)
+    second.mkdir(parents=True)
+    without = _write_run(first, [r for r in rows if r["config"] != "C2"])
+    with_c2 = _write_run(second, rows)
+    assert "C2" not in without
+    assert with_c2.partition("## C2 (post-hoc")[0].rstrip("\n") == without.rstrip("\n")

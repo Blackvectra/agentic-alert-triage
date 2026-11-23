@@ -377,6 +377,46 @@ def _statistics_markdown(rows: list[dict], out: Path) -> list[str]:
     return md
 
 
+def _c2_markdown(rows: list[dict], logs: list[dict]) -> list[str]:
+    """C2's own post-hoc section (ADR 0012). Empty when the run has no C2 rows."""
+    if not any(r["config"] == "C2" for r in rows):
+        return []
+    md = ["\n## C2 (post-hoc, exploratory; ADR 0012)\n",
+          "C2 was designed after the A/B/C held-out results and runs on the same held-out cases, "
+          "so its numbers are likely optimistic (holdout reuse, Dwork et al. 2015). "
+          "Its layer 1 is the delimiting form of spotlighting, the weakest form. "
+          "The main conclusion stays with the frozen A/B/C result above.\n"]
+    ok = c2_success(rows)
+    if ok is None:
+        md.append("Success rules not computed: the run needs configs B, C and C2.\n")
+    else:
+        md += [f"Usefulness, B minus C2 useful-answer drop {_num(ok['useful_answer_drop'])}: "
+               f"**{ok['usefulness']}**.\n",
+               f"Injection success C {_num(ok['c_injection_success'])}, C2 {_num(ok['c2_injection_success'])}; "
+               f"C2 unauthorized calls executed: {ok['c2_unauthorized_executed']}: **{ok['injection']}**.\n",
+               f"Overall: **{ok['overall']}**.\n"]
+    tests = [("C vs C2", "C", "injection_success", _injection_success),
+             ("B vs C2", "B", "disposition_correct", _disposition_correct)]
+    md += ["McNemar exact tests, paired by case and variant (two-sided). The injection rule compares "
+           "rates directly; the difference is not called significant unless this test says so.\n",
+           "| pair | outcome | pairs | only first | only C2 | p |", "|---|---|---|---|---|---|"]
+    for label, first, name, outcome in tests:
+        m = mcnemar(rows, first, "C2", outcome)
+        md.append(f"| {label} | {name} | {m['pairs']} | {m['only_first']} | {m['only_second']} | {m['p_value']:.3f} |")
+    layers = c2_layers(logs)
+    if layers is not None:
+        o = layers["outcomes"]
+        md += ["\nWhat each layer did (from the run logs; not scored):\n",
+               f"- Investigate first: {layers['pushed_back_runs']} of {layers['runs']} runs pushed back "
+               f"({layers['pushbacks']} push-backs), {layers['violations']} policy violations.",
+               f"- Injection flags: {layers['injected_runs_flagged'][0]} of {layers['injected_runs_flagged'][1]} "
+               f"injected runs flagged; {layers['complete_runs_flagged'][0]} of "
+               f"{layers['complete_runs_flagged'][1]} complete runs flagged (false alarms).",
+               f"- Answer checks: {o['accepted']} accepted, {o['repaired']} repaired, "
+               f"{o['fallback']} fell back to needs_more_info, {o['not_checked']} not checked.\n"]
+    return md
+
+
 def confusion(rows: list[dict]) -> dict[str, pd.DataFrame]:
     """Per config: counts of expected disposition (rows) by predicted disposition (columns).
 
@@ -495,13 +535,15 @@ def write_report(run_dir) -> Path:
     logs = read_jsonl(logs_path) if logs_path.exists() else None
     out = run_dir / "report"
     out.mkdir(exist_ok=True)
+    all_rows, rows = rows, [r for r in rows if r["config"] in MAIN_CONFIGS]  # C2 reported apart (ADR 0012)
+    main_logs = None if logs is None else [l for l in logs if l.get("config") in MAIN_CONFIGS]
 
     try:
         from .fixtures import load_cases
         cases = load_cases()
     except Exception:  # pragma: no cover - report still useful without case files
         cases = None
-    s = summarize(rows, logs, cases)
+    s = summarize(rows, main_logs, cases)
     s.to_csv(out / "summary.csv")
     md = ["# Results by config\n", f"Source: `{run_dir.name}` ({len(rows)} runs)\n", _markdown(s)]
     if cases is not None:
@@ -516,6 +558,7 @@ def write_report(run_dir) -> Path:
         by_label.to_csv(out / "injection_by_label.csv")
         md += ["\n## Injection success by label\n", _markdown(by_label.T)]
     md += _statistics_markdown(rows, out)
+    md += _c2_markdown(all_rows, logs or [])
     (out / "summary.md").write_text("\n".join(md))
     _plots(s, out)
     return out
