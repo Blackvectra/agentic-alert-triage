@@ -13,9 +13,16 @@ def row(config="B", variant="complete", expected="true_positive", predicted="tru
             "disposition_correct": predicted == expected and predicted != "needs_more_info",
             "abstain_cell": "answered", "supported_claim_rate": 1.0, "evidence_recall": 1.0,
             "fabricated_citations": [], "unauthorized_attempts": 0, "unauthorized_executed": 0,
-            "injection": None, "output_valid": True, "error": None, "tokens": 100, "latency_s": 2.0}
+            "injection": None, "output_valid": True, "error": None, "tokens": 100, "latency_s": 2.0,
+            "n_claims": 0, "n_recommendations": 0, "unsupported_recommendations": 0}
     base.update(kw)
     return base
+
+
+def injection(success, canary=False, disposition_flip=False, tool_attempt=False):
+    """An injection result shaped like score_run's (the contract test keeps the two in step)."""
+    return {"success": success, "canary": canary,
+            "disposition_flip": disposition_flip, "tool_attempt": tool_attempt}
 
 
 def test_macro_f1_and_missed_attack_rate_by_hand():
@@ -37,8 +44,8 @@ def test_withheld_benign_dismissals_counts_the_empty_search_failure():
 
 
 def test_injection_rates_use_injected_runs_only():
-    hit = {"success": True, "canary": True, "disposition_flip": False, "tool_attempt": True}
-    miss = {"success": False, "canary": False, "disposition_flip": False, "tool_attempt": False}
+    hit = injection(True, canary=True, tool_attempt=True)
+    miss = injection(False)
     rows = [row(variant="injected", injection=hit), row(variant="injected", injection=miss), row()]
     m = report.summarize(rows).loc["B"]
     assert m["injection_success"] == pytest.approx(0.5)
@@ -71,8 +78,8 @@ def test_write_report_produces_tables_and_plots(tmp_path):
 
 def test_injection_success_breaks_down_by_delivery_and_intent():
     from triage.fixtures import load_cases
-    hit = {"success": True, "canary": True, "disposition_flip": False, "tool_attempt": False}
-    miss = {"success": False, "canary": False, "disposition_flip": False, "tool_attempt": False}
+    hit = injection(True, canary=True)
+    miss = injection(False)
     rows = [row(config="B", variant="injected", injection=hit), row(config="C", variant="injected", injection=miss)]
     t = report.injection_by_label(rows, load_cases())
     # AUTH-001 is labelled delivery=disguised, intent=[manipulated_output, harmful_tool_call].
@@ -128,8 +135,8 @@ def _log(config, variant, returned, case_id="AUTH-001"):
 
 def test_payload_seen_counts_injected_runs_that_retrieved_the_injected_record():
     from triage.fixtures import load_cases
-    hit = {"success": True, "canary": True, "disposition_flip": False, "tool_attempt": False}
-    miss = {"success": False, "canary": False, "disposition_flip": False, "tool_attempt": False}
+    hit = injection(True, canary=True)
+    miss = injection(False)
     # Two injected B runs on AUTH-001 (payload in E-EVT-004): one retrieved it, one never did.
     rows = [row(config="B", variant="injected", injection=hit, case_id="AUTH-001"),
             row(config="B", variant="injected", injection=miss, case_id="AUTH-002")]
@@ -141,7 +148,7 @@ def test_payload_seen_counts_injected_runs_that_retrieved_the_injected_record():
 
 
 def test_relative_flip_ignores_answers_the_config_already_gave_without_injection():
-    flip = {"success": True, "canary": False, "disposition_flip": True, "tool_attempt": False}
+    flip = injection(True, disposition_flip=True)
     rows = [
         # AUTH-001, B: benign on complete too (the dry-run pattern): not caused by the injection.
         row(config="B", variant="complete", case_id="AUTH-001", expected="true_positive", predicted="benign"),
@@ -247,8 +254,8 @@ def test_mcnemar_pairs_b_and_c_by_case_and_variant():
 
 
 def test_mcnemar_can_pair_another_outcome_and_skip_rows_it_does_not_cover():
-    hit = {"success": True, "canary": True, "disposition_flip": False, "tool_attempt": True}
-    miss = {"success": False, "canary": False, "disposition_flip": False, "tool_attempt": False}
+    hit = injection(True, canary=True, tool_attempt=True)
+    miss = injection(False)
     rows = [row(config="B", case_id="AUTH-001", variant="injected", injection=hit),
             row(config="C", case_id="AUTH-001", variant="injected", injection=miss),
             row(config="B", case_id="AUTH-002", variant="injected", injection=hit),
@@ -366,8 +373,7 @@ def _c2_rows(c2_right=True, c2_hijacked=0, c_hijacked=2, c2_unauthorized=0):
                             unauthorized_executed=int(cfg == "C2" and i < c2_unauthorized)))
             rows.append(row(config=cfg, case_id=case, variant="injected",
                             predicted="true_positive" if right else "benign",
-                            injection={"success": i < hijacked, "canary": False,
-                                       "disposition_flip": False, "tool_attempt": False}))
+                            injection=injection(i < hijacked)))
     return rows
 
 
@@ -453,3 +459,17 @@ def test_adding_c2_rows_leaves_the_main_report_byte_identical(tmp_path):
     with_c2 = _write_run(second, rows)
     assert "C2" not in without
     assert with_c2.partition("## C2 (post-hoc")[0].rstrip("\n") == without.rstrip("\n")
+
+
+def test_test_helpers_have_exactly_the_keys_scoring_writes():
+    # Contract (docs/specs/test-guardrails.md): hand-built rows must match the real scorer,
+    # so a report test can never pass on a row shape the pipeline does not produce.
+    from triage.fixtures import load_cases
+    from triage.score import score_run
+    case = next(c for c in load_cases() if c["variants"]["injected"].get("injection"))
+    log = {"case_id": case["case_id"], "variant": "injected", "config": "B",
+           "tool_calls": [], "output": None, "output_raw": "", "error": None,
+           "output_valid": False, "input_tokens": 0, "output_tokens": 0, "latency_s": 0.0}
+    scored = score_run(log, case)
+    assert set(row()) == set(scored)
+    assert set(injection(success=True)) == set(scored["injection"])
