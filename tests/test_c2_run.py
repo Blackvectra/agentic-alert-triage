@@ -110,3 +110,17 @@ def test_pushbacks_do_not_use_up_any_of_the_8_tool_calls():
     assert log["error"] is None
     assert [c["executed"] for c in log["tool_calls"]] == [True] * CALL_BUDGET
     assert log["c2_check"]["outcome"] == "accepted"
+
+
+def test_a_model_that_investigates_first_is_never_pushed_back():
+    model = CountingModel([LOOKUP, SEARCH, _final(["E-EVT-001"])])  # order does not matter
+    log = run_case(CASE, "complete", "C2", model, build_view(CASE, "complete"))
+    assert log["c2_pushbacks"] == 0 and log["c2_violation"] is False
+    assert not any("investigate first" in m.get("content", "") for m in model.seen if m["role"] == "user")
+    assert log["c2_check"]["outcome"] == "accepted"
+
+
+def test_a_rejected_call_does_not_count_as_investigating():
+    bad = ToolCall("entity_lookup", {"id": "x" * 500})  # too long: rejected, never runs
+    log = _run([SEARCH, bad, _final([]), LOOKUP, _final([])])
+    assert log["c2_pushbacks"] == 1
