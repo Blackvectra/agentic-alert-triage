@@ -111,3 +111,6 @@ Share of a config's runs that gave an answer: 1 minus the abstention rate. The p
 
 **Selective accuracy**:
 Disposition accuracy over the runs that answered only: how often the model is right when it commits.
+
+**Useful-answer rate**:
+Of the runs where an answer was expected (complete and injected variants), the share answered correctly. Withheld runs and harness errors are left out. ADR 0011 compares C against B on it.

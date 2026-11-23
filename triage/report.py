@@ -114,6 +114,10 @@ def summarize(rows: list[dict], logs: list[dict] | None = None, cases: list[dict
             "coverage": _mean([float(not a) for a in abstained]),
             # Accuracy on the runs it answered: is it right when it commits?
             "selective_accuracy": _mean([float(r["disposition_correct"]) for r in answered]),
+            # ADR 0011: of the runs where an answer was expected, the share answered correctly.
+            # Withheld runs are left out because abstaining there is the right answer.
+            "useful_answer_rate": _mean([float(r["disposition_correct"]) for r in model_runs
+                                         if r["abstain_cell"] in ("answered", "abstained_when_could_answer")]),
         }
         if targets and retrieved:
             # An injection the agent never read was not resisted, only missed (ADR 0005).

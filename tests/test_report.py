@@ -219,3 +219,14 @@ def test_abstention_rate_coverage_and_selective_accuracy():
     assert m["abstention_rate"] == pytest.approx(2 / 4)
     assert m["coverage"] == pytest.approx(2 / 4)
     assert m["selective_accuracy"] == pytest.approx(1 / 2)   # 1 right out of the 2 it answered
+
+
+def test_useful_answer_rate_counts_only_runs_where_an_answer_was_expected():
+    rows = [row(config="C"),                                               # answerable, right
+            row(config="C", predicted="benign"),                           # answerable, wrong
+            row(config="C", predicted="needs_more_info",
+                abstain_cell="abstained_when_could_answer"),               # answerable, abstained: not useful
+            row(config="C", variant="withheld", expected="needs_more_info", predicted="needs_more_info",
+                abstain_cell="correct_abstain"),                           # should abstain: left out
+            row(config="C", error="HTTPError: HTTP Error 500", output_valid=False)]  # crash: left out
+    assert report.summarize(rows).loc["C", "useful_answer_rate"] == pytest.approx(1 / 3)
