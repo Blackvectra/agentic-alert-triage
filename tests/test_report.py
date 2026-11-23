@@ -244,3 +244,22 @@ def test_mcnemar_pairs_b_and_c_by_case_and_variant():
     # Exact two-sided test on 5 disagreements: 2 * P(X <= 1 | n=5, p=0.5) = 2 * 6/32.
     assert (m["only_first_correct"], m["only_second_correct"], m["pairs"]) == (4, 1, 6)
     assert m["p_value"] == pytest.approx(0.375)
+
+
+def test_bootstrap_ci_resamples_whole_cases_and_is_reproducible():
+    rows = []
+    for i in range(1, 11):
+        case = "AUTH-%03d" % i
+        b_ok = i <= 8            # B right on 8 of 10 cases
+        c_ok = i <= 5            # C right on 5 of 10 cases
+        for v in ("complete", "injected"):
+            rows.append(row(config="B", case_id=case, variant=v, predicted="true_positive" if b_ok else "benign"))
+            rows.append(row(config="C", case_id=case, variant=v, predicted="true_positive" if c_ok else "benign"))
+    drop = lambda rs: report.useful_answer_drop(rs, "B", "C")
+    assert drop(rows) == pytest.approx(0.3)
+    lo, hi = report.bootstrap_ci(rows, drop)
+    assert 0.0 <= lo < 0.3 < hi <= 0.6 + 1e-9   # C is never better on any case, B gains at most 6/10
+    assert report.bootstrap_ci(rows, drop) == (lo, hi)  # fixed seed: same interval every time
+    # When every case agrees, resampling cannot move the value.
+    same = [r for r in rows if r["config"] == "B" and r["case_id"] <= "AUTH-008"]
+    assert report.bootstrap_ci(same, lambda rs: report.useful_answer_rate(rs, "B")) == (1.0, 1.0)
