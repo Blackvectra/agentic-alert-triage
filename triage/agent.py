@@ -24,6 +24,11 @@ from .tools import ALLOWED_TOOLS, IMPLEMENTATIONS, TOOL_SPECS
 
 CALL_BUDGET = 8  # identical for B and C so the comparison is fair
 
+# Raise this by one whenever _parse_output reads an answer differently. It is logged with every
+# run, and resume reruns any run made with another number, because a saved answer that was read
+# the old way would otherwise be mixed with new ones (ADR 0010). 2 = removes a code block.
+ANSWER_PARSER_VERSION = 2
+
 OUTPUT_SCHEMA = {
     "type": "object",
     "required": ["disposition", "abstain", "claims", "proposed_actions"],
@@ -324,6 +329,7 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
         "model": model.name, "tool_calls": [], "output_raw": None, "output": None,
         "output_valid": None, "gate": [], "input_tokens": 0, "output_tokens": 0, "error": None,
         "model_settings": getattr(model, "settings", {}), "prompt_sha256": prompt_sha256,
+        "answer_parser": ANSWER_PARSER_VERSION,
         # Only providers that can refuse report it; the report shows n/a for the rest.
         "refusals_measured": getattr(model, "reports_refusals", False),
     }

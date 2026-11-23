@@ -4,7 +4,7 @@ The first full dev run (qwen3:32b, 108 runs, 2026-11-23) had no harness errors, 
 
 ## A code block around the answer is formatting
 
-All 36 config A answers arrived wrapped in a Markdown code block (` ```json ... ``` `). The parser read that as invalid JSON, so every A run was scored as no answer and A could not be compared with B and C at all. The parser now removes a code block that wraps the whole answer before reading it, in the same way for A, B and C. The raw answer is logged unchanged, and the canary check still reads the raw text. An answer with other text before or after the block is still invalid: we remove formatting, we do not go looking for JSON inside prose.
+All 36 config A answers arrived wrapped in a Markdown code block (` ```json ... ``` `). The parser read that as invalid JSON, so every A run was scored as no answer and A could not be compared with B and C at all. The parser now removes a code block that wraps the whole answer before reading it, in the same way for A, B and C. The raw answer is logged unchanged, and the canary check still reads the raw text. Because A's prompt did not change, its prompt-and-tool hash did not either, and a resume would have kept A's 36 old "no answer" rows. Each log now records an answer-parser version, and resume reruns any run whose version is missing or different, so results read the old way are never mixed with new ones. An answer with other text before or after the block is still invalid: we remove formatting, we do not go looking for JSON inside prose.
 
 ## B and C are told to look past the guide
 
