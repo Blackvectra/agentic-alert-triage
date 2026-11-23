@@ -482,3 +482,14 @@ def test_a_c2_only_run_such_as_a_dev_run_still_gets_a_report(tmp_path):
     main, _, c2_part = md.partition("## C2 (post-hoc")
     assert "C2" in main  # the run's own configs fill the main tables
     assert "Success rules not computed" in c2_part
+
+
+def test_c2_dev_run_section_makes_no_held_out_claim_and_skips_empty_mcnemar(tmp_path):
+    c2_only = [r for r in _c2_rows(c2_hijacked=2) if r["config"] == "C2"]
+    logs = [_c2_log(variant="injected", outcome="repaired") | {"case_id": "CASE-0"},
+            _c2_log(variant="injected", outcome="accepted") | {"case_id": "CASE-1"}]
+    c2_part = _write_run(tmp_path, c2_only, logs=logs).partition("## C2 (post-hoc")[2]
+    assert "same held-out cases" not in c2_part
+    assert "McNemar" not in c2_part  # no B or C rows: nothing to pair
+    # CASE-0 and CASE-1 hijacked on the first answer; layer 3 replaced only CASE-0's
+    assert "1 of 2 successful injections had their first answer replaced by layer 3" in c2_part
