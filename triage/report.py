@@ -8,6 +8,7 @@ score.py; this module adds no judgement of its own.
 """
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -134,6 +135,26 @@ def summarize(rows: list[dict], logs: list[dict] | None = None, cases: list[dict
                              if any(l.get("refusals_measured") for l in cfg_logs) else None)
         out[cfg] = m
     return pd.DataFrame.from_dict(out, orient="index")
+
+
+def mcnemar(rows: list[dict], first: str = "B", second: str = "C") -> dict:
+    """Exact McNemar test on disposition_correct, pairing two configs by (case_id, variant).
+
+    Only runs where the two configs disagree carry information. Under "no difference",
+    each disagreement is a fair coin flip, so the p-value is an exact two-sided binomial.
+    Pairs where either side is missing or a harness error are dropped.
+    """
+    by_key: dict[str, dict] = {first: {}, second: {}}
+    for r in rows:
+        if r["config"] in by_key and not is_harness_error(r.get("error")):
+            by_key[r["config"]][(r["case_id"], r["variant"])] = bool(r["disposition_correct"])
+    keys = by_key[first].keys() & by_key[second].keys()
+    only_first = sum(by_key[first][k] and not by_key[second][k] for k in keys)
+    only_second = sum(by_key[second][k] and not by_key[first][k] for k in keys)
+    n = only_first + only_second
+    tail = sum(math.comb(n, i) for i in range(min(only_first, only_second) + 1)) / 2 ** n
+    return {"pairs": len(keys), "only_first_correct": only_first,
+            "only_second_correct": only_second, "p_value": min(1.0, 2 * tail)}
 
 
 def confusion(rows: list[dict]) -> dict[str, pd.DataFrame]:
