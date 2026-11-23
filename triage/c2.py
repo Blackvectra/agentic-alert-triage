@@ -107,7 +107,7 @@ def answer_problems(answer: dict, retrieved_ids: set[str], records: list[dict] =
     if answer.get("disposition") == "benign":
         for eid, meaning in known_bad_indicators(list(records)):
             problems.append(f"answered benign, but {eid} shows a known-bad sign: {meaning}")
-    return problems
+    return list(dict.fromkeys(problems))  # a record fetched twice is one reason, not two
 
 
 # What a failed answer becomes after its one repair turn: abstain and propose nothing. The code
