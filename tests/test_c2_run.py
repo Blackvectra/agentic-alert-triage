@@ -77,8 +77,9 @@ def test_every_config_is_listed_once_and_everyone_uses_that_list():
     from triage import agent, freeze, report, run
     assert set(agent.PROMPTS) == set(agent.MAIN_CONFIGS) | set(agent.EXPLORATORY_CONFIGS)
     assert not set(agent.MAIN_CONFIGS) & set(agent.EXPLORATORY_CONFIGS)
-    for module in (run, freeze, report):
+    for module in (run, report):
         assert module.CONFIGS is agent.MAIN_CONFIGS, module.__name__
+    assert freeze.CONFIGS == agent.MAIN_CONFIGS + agent.EXPLORATORY_CONFIGS  # C2 frozen too (ADR 0012)
 
 
 # --- Layer 2: investigate first (ADR 0012) ---
