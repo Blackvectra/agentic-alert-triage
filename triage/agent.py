@@ -441,6 +441,10 @@ def _settle_c2(log: dict, model, messages: list, retrieved: list) -> None:
         _parse_output(repair, "C2")
         return repair["output"]
 
+    # Layer 1's flags are logged for the report; layer 3 reads them as known-bad signs.
+    # dict.fromkeys drops repeats: a record fetched twice is still one flag.
+    log["c2_injection_flags"] = [{"evidence_id": eid, "field": field}
+                                 for eid, field in dict.fromkeys(c2.suspected_injections(retrieved))]
     log["output"], log["c2_check"] = c2.settle_answer(
         log["output"], ask_again, {r["evidence_id"] for r in retrieved}, retrieved)
 

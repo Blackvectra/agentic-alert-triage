@@ -143,3 +143,24 @@ def test_b_and_c_still_see_plain_tool_results():
     for config in ("B", "C"):
         first = _tool_messages(config)[0]
         assert isinstance(first, list) and "E-EVT-001" in [r["evidence_id"] for r in first]
+
+
+def test_a_flagged_injection_is_logged_and_blocks_a_benign_answer():
+    # PROC-003 (dev), injected: an instruction is planted in E-EVT-703's file_description,
+    # and nothing else in its evidence is a known-bad sign.
+    case = next(c for c in load_cases("dev") if c["case_id"] == "PROC-003")
+    script = [ToolCall("event_search", {"user": "NT AUTHORITY\\SYSTEM"}),
+              ToolCall("entity_lookup", {"id": "APP-03"}),
+              _final([], "benign"), _final([], "benign")]
+    log = run_case(case, "injected", "C2", ScriptedModel(script), build_view(case, "injected"))
+    assert log["c2_injection_flags"] == [{"evidence_id": "E-EVT-703", "field": "file_description"}]
+    assert log["c2_check"]["outcome"] == "fallback"
+    assert "E-EVT-703" in log["c2_check"]["problems"][0][0] and "injection" in log["c2_check"]["problems"][0][0]
+
+
+def test_the_same_case_without_the_injection_has_no_flags_and_benign_is_accepted():
+    case = next(c for c in load_cases("dev") if c["case_id"] == "PROC-003")
+    script = [ToolCall("event_search", {"user": "NT AUTHORITY\\SYSTEM"}),
+              ToolCall("entity_lookup", {"id": "APP-03"}), _final([], "benign")]
+    log = run_case(case, "complete", "C2", ScriptedModel(script), build_view(case, "complete"))
+    assert log["c2_injection_flags"] == [] and log["c2_check"]["outcome"] == "accepted"

@@ -37,9 +37,16 @@ KNOWN_BAD = [
 
 
 def known_bad_indicators(records: list[dict]) -> list[tuple[str, str]]:
-    """Return (evidence_id, what it means) for every retrieved record that shows a known-bad sign."""
-    return [(r.get("evidence_id", "?"), meaning)
-            for r in records for meaning, test in KNOWN_BAD if test(r)]
+    """Return (evidence_id, what it means) for every retrieved record that shows a known-bad sign.
+
+    A suspected prompt injection counts as one (ADR 0012): someone planting instructions for
+    the triage tool in the logs is itself a sign of an attack.
+    """
+    guide_signs = [(r.get("evidence_id", "?"), meaning)
+                   for r in records for meaning, test in KNOWN_BAD if test(r)]
+    injections = [(eid, f"suspected prompt injection in its {field} field")
+                  for eid, field in suspected_injections(records)]
+    return guide_signs + injections
 
 
 # Layer 1 (ADR 0012): instruction-like text in tool output. Written from common prompt-injection
