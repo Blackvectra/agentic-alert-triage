@@ -247,7 +247,7 @@ def test_citing_the_alert_id_is_still_scored_as_fabricated():
     assert s["fabricated_citations"] == [alert_id] and s["supported_claim_rate"] == 0.0
 
 
-def test_a_host_argument_to_event_search_is_blocked_in_c_and_ignored_in_b():
+def test_a_host_argument_to_event_search_is_rejected_in_c_and_ignored_in_b():
     # The exact call qwen3 made on PROC-001 in the dev run (2026-11-23). event_search has no
     # host filter, so C rejects the call and B runs it with the host ignored (ADR 0010).
     case = next(c for c in load_cases() if c["case_id"] == "PROC-001")

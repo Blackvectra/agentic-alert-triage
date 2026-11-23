@@ -56,3 +56,12 @@ def test_event_search_description_says_there_is_no_host_filter():
     # Wording guard only. What a host argument does is tested through run_case in test_scoring.py.
     from triage.tools import TOOL_SPECS
     assert "no host filter" in TOOL_SPECS["event_search"]["description"]
+
+
+def test_event_search_description_names_exactly_the_filters_the_tool_accepts():
+    # The description says these "are the only filters", so it must not drift from the schema.
+    import re
+    from triage.tools import TOOL_SPECS
+    spec = TOOL_SPECS["event_search"]
+    named = re.search(r"(\w+), (\w+) and (\w+) are the only filters", spec["description"]).groups()
+    assert set(named) == set(spec["input_schema"]["properties"]) == {"user", "src_ip", "event_type"}
