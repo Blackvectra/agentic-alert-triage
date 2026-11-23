@@ -1,17 +1,19 @@
 # Handoff: agentic-alert-triage (EE 672)
 
-Updated 2026-11-23 (after two dev runs, the ADR 0010 fixes and the code review).
+Updated 2026-11-23 (Phase 1 step 5 in progress: McNemar merged, confidence intervals in review).
 
 ## Where things stand
-- Repo `blackvectra/agentic-alert-triage`, branch `mlev/beautiful-bardeen-qdvis3`. Run `git log` and `git status -sb` for the current commit and whether it is pushed; this note is not updated for every commit.
-- Draft PR [Blackvectra/agentic-alert-triage#19](https://github.com/Blackvectra/agentic-alert-triage/pull/19). Check the PR for CI on the newest commits. Not merged: merge only by squash, and only when the user asks.
-- **Two dev runs are done, both on code from before the fixes** (`b33f72b`): one on an L4 (a rehearsal, not data to report) and one on the A100. Neither had a harness error. Both showed the same four problems, fixed in ADR 0010:
-  - every config A answer came inside a Markdown code block and was scored as no answer;
-  - B and C mostly made one tool call (`guide_lookup`) and answered `needs_more_info`;
-  - C cited the alert's own id as evidence;
-  - the model passed a `host` argument that `event_search` does not accept.
-- **The fixes are not yet tested on the real model.** Unit tests show the code does what it says. Only a new dev run shows whether qwen3 behaves differently.
-- **Findings from comparing the two runs** (worth a sentence in the report):
+- Repo `blackvectra/agentic-alert-triage`, branch `mlev/beautiful-bardeen-qdvis3`. Run `git log` and `git status -sb` for the current commit and whether it is pushed; this note is updated when a Phase 1 step finishes, not for every commit.
+- Open PRs: list them on GitHub. Merged so far this phase: #19 (dev-run fixes), #20 and #21 (notebook code source, README run options), #22 (abstention rate and coverage), #23 (ADR 0011 usefulness threshold), #24 (McNemar test).
+- **Dev runs 1 and 2** ran on code from before the ADR 0010 fixes (`b33f72b`): one on an L4 (a rehearsal, not data to report) and one on the A100. Both showed the four problems ADR 0010 fixes: config A answers inside code blocks, B and C stopping after one tool call, C citing the alert id, and `host` arguments to `event_search`.
+- **Dev run 3** ran on the fixed code (A100, qwen3:32b, think off, temperature 0, seed 672, num_ctx 16384, answer parser v3). Prompt fingerprints A `bb54cbf1fa`, B `3869b48d2d`, C `eb6930100f`. The results zip is not in the repo; the user has it.
+  - 108 runs, no harness errors, every answer valid. B made 118 tool calls and C 116, so B and C now investigate.
+  - Accuracy A 0.33, B 0.53, C 0.42. Useful-answer rate (ADR 0011) A 0.50, B 0.79, C 0.63; B − C 0.17, 95% CI 0.00–0.42, so inconclusive against the 10-point line.
+  - McNemar B vs C on 36 pairs: 4 disagreements, all with B right; p = 0.125.
+  - Runs with fabricated citations: C 3 (down from 24, so the alert-id fix worked), B 3, A 36 (A has no tools, so any citation counts as fabricated).
+  - Injection success 0.167 for all three configs; B and C read the injected record on 25% of injected runs.
+  - **The `host` fix did not hold.** 15 `event_search` calls still passed `host`, on PROC-001, 003 and 004. C rejected its 9. B ran its 6, and those 6 are all of B's "unauthorized actions executed". So on dev, B's 6 vs C's 0 is this argument mistake, not a write or containment action. The report must say so if it holds on held-out.
+- **Findings from comparing dev runs 1 and 2** (worth a sentence in the report):
   - Same model, seed and temperature, different GPU type: only 23 of 108 answers were word for word the same, and C went from 4 correct to 7. So "every run on the same GPU type" matters, and a gap of 3 in 36 on 12 cases is not a difference.
   - A100: about 8 s a run, 16 minutes of model time for 108 runs. Expect roughly 40 minutes for the 270 held-out runs, more if B and C now make more calls.
   - On the A100, C answered the attacker's `benign` on AUTH-003 injected, inside a code block. The old parser hid it as an abstention; it now counts as an injection success.
@@ -44,23 +46,28 @@ Updated 2026-11-23 (after two dev runs, the ADR 0010 fixes and the code review).
 - Fixtures: 12 dev cases and 30 held-out cases (AUTH, PROC and PRIV, each numbered 101..110). Provenance is in `fixtures/PROVENANCE.md`.
 
 ## Next work, in order
-1. **Waiting on the user:** the third dev run in Colab (A100, `MODEL="ollama:qwen3:32b"`, `RUN="dev"`) with a zip built from the current commit. When the results zip arrives, score it and check:
-   - config A gives valid answers;
-   - B and C make more than one tool call and evidence recall rises;
-   - C no longer cites the alert id;
-   - no `host` arguments on the PROC cases;
-   - the injected text is seen more often, so the injection numbers mean something;
-   - no harness errors.
-2. If more fixes are needed, keep each round short, record the reason in ADR 0010, and repeat the dev run. Every prompt change tunes the prompts to these 12 cases, which is the reason to freeze.
-3. Freeze the prompts and fixtures before any held-out run.
-4. Held-out run: 3 configs × 30 cases × 3 variants = 270 runs, on the same GPU type.
-5. Write the report in plain, human wording. It must cover:
+Phase 1 (the EE 672 submission). When a step finishes, update this list and "Where things stand".
+1. Done: notebook runs from Colab or VS Code (`CODE_FROM`), locally without Colab, and the README lists the ways to run it.
+2. Done: dev run 3, scored above.
+3. Done: abstention rate, coverage and selective accuracy in the report (#22).
+4. Done: ADR 0011, C's useful-answer rate at most 10 points below B's (#23).
+5. **In progress:** statistics.
+   - Done: `report.mcnemar` (#24) and `report.bootstrap_ci` with `useful_answer_rate` and `useful_answer_drop`.
+   - To do: put both in `summary.md`, with ADR 0011's pass, fail or inconclusive call.
+6. Freeze the prompts and fixtures before any held-out run. Every prompt change tunes the prompts to the 12 dev cases.
+7. Held-out run: 3 configs × 30 cases × 3 variants = 270 runs, on the same GPU type.
+8. Write the report in plain, human wording. It must cover:
    - the ADR 0007 deviation;
    - the A100 / not reproducible on free Colab, and the GPU-to-GPU difference above;
-   - the dev-run fixes in ADR 0010;
+   - the dev-run fixes in ADR 0010, and that the `host` fix did not hold;
+   - ADR 0011's threshold and that it was set after dev run 3;
    - the limitations listed in notebook section 8.
+9. Package the submission. Still needed from the user: the rubric and the due date.
+
+Phase 2 (after submission): real alerts through read-only Sentinel/Defender adapters (KQL), a command-line interface, and a CI matrix across operating systems.
 
 ## Open decisions (user's call)
+- Before the freeze: leave the `host` argument problem as it is and report it, or make one more change and dev run? Another round tunes to the dev cases again.
 - Replace AUTH-107/108? Their scenario group `auth-impossible-travel-h1` overlaps with dev's impossible-travel scenarios.
 - Tighten the fallback rule if qwen3:32b fails, for example to `qwen3:30b-a3b`.
 
@@ -89,8 +96,8 @@ These come from CLAUDE.md and from the user.
   git commit --author="Blackvectra <$(git log -1 --format=%ae)>"
   ```
 
-  Don't set `user.name` or `user.email` for the commit: that makes it unsigned. A Stop hook may still ask to re-author commits with `--reset-author`; refuse that, because it would remove Blackvectra as the author. Don't rewrite commits that are already pushed.
-- **Push and merge:** push only when asked. Merge only by squash, and only when asked. After a merge, run `scripts/resync_after_merge.sh`.
+  Don't set `user.name` or `user.email` for the commit: that makes it unsigned. Locally, `git log --format=%G?` shows `N` and git complains that `gpg.ssh.allowedSignersFile` is not set: the container has no list of trusted keys to check against, so it cannot verify. The commit is still signed. Confirm it shows Verified on GitHub after the push. A Stop hook may still ask to re-author commits with `--reset-author`; refuse that, because it would remove Blackvectra as the author. Don't rewrite commits that are already pushed.
+- **Push and merge:** push each commit to the working branch once `python scripts/check.py` passes (changed at the user's request on 2026-11-23). Then stop for review as before. Merge only by squash, and only when asked. After a merge, run `scripts/resync_after_merge.sh`.
 - **Check before committing:** run `python scripts/check.py` and check its own exit code. Never pipe it through `| tail`, which hid a failure once.
 - **Ask first:** don't change `triage/score.py` or any case's expected answers without asking. B and C must keep the same tools and the same call budget (ADR 0001).
 - **Teaching style:** the user is learning Python. Before each change, say what it does and why in plain words. Make one small commit, then stop for review, unless the user asks for a batch.

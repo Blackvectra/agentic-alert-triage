@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restart the working branch from main after its PR was squash-merged,
+# Restart the working branch from main after its PR merged (squash or merge commit),
 # keeping any local commits that were not in the merged PR. No force-push needed.
 # Usage: scripts/resync_after_merge.sh [branch]   (default: current branch)
 set -euo pipefail
@@ -13,7 +13,7 @@ unpushed=$(git rev-list --reverse "$remote_tip..HEAD")
 
 git checkout -q -B "$branch" origin/main
 # Record the old remote tip as merged, so the next push is a fast-forward.
-git merge -q --no-edit -s ours "$remote_tip" -m "Resync branch after squash merge"
+git merge -q --no-edit -s ours "$remote_tip" -m "Resync branch after merge"
 for c in $unpushed; do git cherry-pick "$c" >/dev/null; done
 
 echo "Resynced $branch onto origin/main; re-applied $(echo $unpushed | wc -w) local commit(s)."
