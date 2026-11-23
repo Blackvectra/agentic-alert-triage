@@ -68,3 +68,19 @@ def test_log_says_refusals_were_measured_for_the_anthropic_adapter():
     client = FakeClient([text_response(ANSWER)])
     log = run_case(case, "complete", "B", AnthropicModel(client=client, model_id="claude-sonnet-5-5"), view)
     assert log["refusals_measured"] is True
+
+
+def test_c2_push_back_is_replayed_as_plain_text():
+    # A C2 push-back answer is text, not a tool call (same bug as the Ollama adapter had).
+    case, view = auth_001()
+    # Never investigates: two push-backs, then the third answer is accepted as a violation. It cites
+    # an id no tool returned, so layer 3 asks once more (fourth reply) before falling back.
+    client = FakeClient([text_response("too early"), text_response("too early"),
+                         text_response(ANSWER), text_response(ANSWER)])
+
+    log = run_case(case, "complete", "C2", AnthropicModel(client=client, model_id="claude-sonnet-5-5"), view)
+
+    assert log["error"] is None and log["c2_pushbacks"] == 2 and log["c2_violation"]
+    second = client.requests[1]["messages"]
+    assert [m["role"] for m in second] == ["user", "assistant", "user"]
+    assert second[1]["content"] == "too early"

@@ -186,6 +186,8 @@ class AnthropicModel:
         for m in messages:
             if m["role"] == "user":
                 out.append(m)
+            elif m["role"] == "assistant" and "tool_call" not in m:
+                out.append({"role": "assistant", "content": m["content"]})  # C2 push-back or repair: plain text
             elif m["role"] == "assistant":
                 out.append({"role": "assistant", "content": self._tool_replies[k][0]})
             elif m["role"] == "tool":
@@ -305,6 +307,8 @@ class OllamaModel:
         for m in messages:
             if m["role"] == "user":
                 out.append(m)
+            elif m["role"] == "assistant" and "tool_call" not in m:
+                out.append({"role": "assistant", "content": m["content"]})  # C2 push-back or repair: plain text
             elif m["role"] == "assistant":
                 out.append(self._tool_replies[k])
             elif m["role"] == "tool":
