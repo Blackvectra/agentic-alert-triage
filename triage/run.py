@@ -162,15 +162,17 @@ def main(argv=None) -> None:
 
     done = _prepare_resume(out_dir)
     new_logs = []
-    total = len(cases) * RUNS_PER_CASE
-    finished = 0  # runs finished so far, counting ones skipped because an earlier session did them
+    planned = [(case["case_id"], variant, config) for case in cases for variant in VARIANTS for config in CONFIGS]
+    total = len(planned)
+    # Start from what an earlier session already finished, so the counter and the time left
+    # only ever count runs that are still to do.
+    finished = sum(key in done for key in planned)
     with open(out_dir / "logs.jsonl", "a") as logs, open(out_dir / "scores.jsonl", "a") as scores:
         for case in cases:
             for variant in VARIANTS:
                 view = build_view(case, variant)
                 for config in CONFIGS:
                     if (case["case_id"], variant, config) in done:
-                        finished += 1
                         continue
                     log = run_case(case, variant, config, make_model(), view)  # fresh model per run
                     logs.write(json.dumps(log) + "\n")

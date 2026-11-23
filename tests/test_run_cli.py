@@ -50,6 +50,19 @@ def test_progress_counts_runs_an_earlier_session_already_did(tmp_path, capsys):
     assert capsys.readouterr().out.splitlines()[0].startswith("[9/9] AUTH-001 injected  C")
 
 
+def test_time_left_on_a_resumed_run_counts_only_the_runs_still_to_do(tmp_path, capsys):
+    out_dir = tmp_path / "dry"
+    run.main(["--dry-run", "--out", str(out_dir)])
+    logs = lines(out_dir / "logs.jsonl")
+    logs[0]["error"] = "URLError: timed out"   # the very first run failed; the eight after it are fine
+    _rewrite(out_dir / "logs.jsonl", logs)
+    capsys.readouterr()
+    run.main(["--dry-run", "--out", str(out_dir)])
+    first = capsys.readouterr().out.splitlines()[0]
+    # One run to redo: it is the 9th to finish and nothing is left after it.
+    assert first.startswith("[9/9] AUTH-001 complete  A") and "min left" not in first
+
+
 def test_time_left_uses_the_typical_run_not_the_slow_first_one():
     logs = [{"latency_s": 600.0}, {"latency_s": 60.0}, {"latency_s": 60.0}]
     assert run._time_left(logs, 10) == "  about 10 min left"
