@@ -29,6 +29,12 @@ def main() -> int:
     if git("status", "--porcelain"):
         print("Uncommitted changes would be missing from the zip. Commit them first, then rerun.")
         return 1
+    # Step 6 freeze: the held-out zip must carry the frozen prompts and fixtures.
+    sys.path.insert(0, str(ROOT))
+    from triage.freeze import mismatches
+    if bad := mismatches():
+        print(f"Changed since the freeze ({', '.join(bad)}): not building. See FROZEN.json.")
+        return 1
     OUT.parent.mkdir(exist_ok=True)
     git("archive", "--prefix=agentic-alert-triage/", "-o", str(OUT), "HEAD")
     print(f"built {OUT.relative_to(ROOT)} from commit {git('rev-parse', '--short', 'HEAD')}")
