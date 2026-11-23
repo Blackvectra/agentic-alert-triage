@@ -473,3 +473,12 @@ def test_test_helpers_have_exactly_the_keys_scoring_writes():
     scored = score_run(log, case)
     assert set(row()) == set(scored)
     assert set(injection(success=True)) == set(scored["injection"])
+
+
+def test_a_c2_only_run_such_as_a_dev_run_still_gets_a_report(tmp_path):
+    # The first C2 dev run (CONFIGS = "C2") crashed the report: no A/B/C rows left for the main tables.
+    c2_only = [r for r in _c2_rows() if r["config"] == "C2"]
+    md = _write_run(tmp_path, c2_only, logs=[_c2_log()])
+    main, _, c2_part = md.partition("## C2 (post-hoc")
+    assert "C2" in main  # the run's own configs fill the main tables
+    assert "Success rules not computed" in c2_part

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .agent import MAIN_CONFIGS, is_harness_error
+from .agent import EXPLORATORY_CONFIGS, MAIN_CONFIGS, is_harness_error
 from .fixtures import VARIANTS
 from .jsonl import read_jsonl
 
@@ -535,8 +535,10 @@ def write_report(run_dir) -> Path:
     logs = read_jsonl(logs_path) if logs_path.exists() else None
     out = run_dir / "report"
     out.mkdir(exist_ok=True)
-    all_rows, rows = rows, [r for r in rows if r["config"] in MAIN_CONFIGS]  # C2 reported apart (ADR 0012)
-    main_logs = None if logs is None else [l for l in logs if l.get("config") in MAIN_CONFIGS]
+    # C2 is reported apart (ADR 0012). A run with no A/B/C (a C2 dev run) fills the main tables itself.
+    main = [c for c in MAIN_CONFIGS if any(r["config"] == c for r in rows)] or EXPLORATORY_CONFIGS
+    all_rows, rows = rows, [r for r in rows if r["config"] in main]
+    main_logs = None if logs is None else [l for l in logs if l.get("config") in main]
 
     try:
         from .fixtures import load_cases
