@@ -100,3 +100,13 @@ def test_a_model_that_never_investigates_is_accepted_after_two_pushbacks_as_a_vi
     assert sum("investigate first" in m.get("content", "") for m in model.seen if m["role"] == "user") == 2
     assert log["tool_calls"] == [] and log["error"] is None
     assert (log["input_tokens"], log["output_tokens"]) == (30, 3)  # the answer and 2 push-backs
+
+
+def test_pushbacks_do_not_use_up_any_of_the_8_tool_calls():
+    from triage.agent import CALL_BUDGET
+    calls = [SEARCH, LOOKUP] + [SEARCH] * (CALL_BUDGET - 2)
+    log = _run([_final([]), _final([])] + calls + [_final(["E-EVT-001"])])
+    assert log["c2_pushbacks"] == 2 and log["c2_violation"] is False
+    assert log["error"] is None
+    assert [c["executed"] for c in log["tool_calls"]] == [True] * CALL_BUDGET
+    assert log["c2_check"]["outcome"] == "accepted"

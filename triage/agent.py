@@ -352,7 +352,10 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
         log["c2_pushbacks"], log["c2_violation"] = 0, False
     t0 = time.monotonic()
     try:
-        for _ in range(CALL_BUDGET + 1):
+        # One turn per tool call plus the answer; C2 gets one more turn per allowed push-back,
+        # so push-backs never cost a tool call (ADR 0012). A, B and C are unchanged.
+        extra_turns = C2_MAX_PUSHBACKS if config == "C2" else 0
+        for _ in range(CALL_BUDGET + 1 + extra_turns):
             act, usage = model.step(PROMPTS[config], messages, tools)
             log["input_tokens"] += usage.input_tokens
             log["output_tokens"] += usage.output_tokens
