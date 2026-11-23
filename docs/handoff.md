@@ -96,7 +96,7 @@ These come from CLAUDE.md and from the user.
   git commit --author="Blackvectra <$(git log -1 --format=%ae)>"
   ```
 
-  Don't set `user.name` or `user.email` for the commit: that makes it unsigned. A Stop hook may still ask to re-author commits with `--reset-author`; refuse that, because it would remove Blackvectra as the author. Don't rewrite commits that are already pushed.
+  Don't set `user.name` or `user.email` for the commit: that makes it unsigned. Locally, `git log --format=%G?` shows `N` and git complains that `gpg.ssh.allowedSignersFile` is not set: the container has no list of trusted keys to check against, so it cannot verify. The commit is still signed. Confirm it shows Verified on GitHub after the push. A Stop hook may still ask to re-author commits with `--reset-author`; refuse that, because it would remove Blackvectra as the author. Don't rewrite commits that are already pushed.
 - **Push and merge:** push only when asked. Merge only by squash, and only when asked. After a merge, run `scripts/resync_after_merge.sh`.
 - **Check before committing:** run `python scripts/check.py` and check its own exit code. Never pipe it through `| tail`, which hid a failure once.
 - **Ask first:** don't change `triage/score.py` or any case's expected answers without asking. B and C must keep the same tools and the same call budget (ADR 0001).
