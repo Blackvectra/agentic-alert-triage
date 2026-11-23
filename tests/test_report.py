@@ -331,3 +331,22 @@ def test_write_report_adds_the_b_vs_c_statistics(tmp_path):
     assert "## B vs C" in md and "pass" in md and "McNemar" in md
     assert (tmp_path / "report" / "intervals.csv").exists()
     assert (tmp_path / "report" / "b_vs_c.csv").exists()
+
+
+def test_summary_is_plain_ascii_so_it_reads_the_same_on_windows(tmp_path):
+    # write_text uses the system encoding (cp1252 on Windows); ASCII reads the same everywhere.
+    rows = _paired_rows(lambda i: i <= 7, lambda i: i <= 5)
+    (tmp_path / "scores.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    report.write_report(tmp_path)
+    (tmp_path / "report" / "summary.md").read_text().encode("ascii")
+
+
+def test_intervals_of_no_rows_is_an_empty_table():
+    t = report.intervals([])
+    assert t.empty and list(t.columns) == ["value", "ci_low", "ci_high"]
+
+
+def test_report_on_a_run_with_no_scored_runs_says_so(tmp_path):
+    (tmp_path / "scores.jsonl").write_text("")
+    with pytest.raises(ValueError, match="no scored runs"):
+        report.write_report(tmp_path)

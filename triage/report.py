@@ -247,9 +247,8 @@ def intervals(rows: list[dict]) -> pd.DataFrame:
             ci = bootstrap_ci(rows, lambda rs: metric(rs, cfg))
             out[(cfg, name)] = {"value": metric(rows, cfg),
                                 "ci_low": ci[0] if ci else None, "ci_high": ci[1] if ci else None}
-    t = pd.DataFrame.from_dict(out, orient="index")
-    t.index.names = ["config", "metric"]
-    return t
+    index = pd.MultiIndex.from_tuples(list(out), names=["config", "metric"])
+    return pd.DataFrame(list(out.values()), index=index, columns=["value", "ci_low", "ci_high"])
 
 
 USEFULNESS_THRESHOLD = 0.10  # ADR 0011: C may be at most 10 points below B
@@ -299,7 +298,7 @@ def _statistics_markdown(rows: list[dict], out: Path) -> list[str]:
         md.append("| metric | " + " | ".join(cfgs) + " |")
         md.append("|---" * (len(cfgs) + 1) + "|")
         for name in INTERVAL_METRICS:
-            cells = [f"{_num(t.loc[(c, name), 'value'])} ({_num(t.loc[(c, name), 'ci_low'])}–"
+            cells = [f"{_num(t.loc[(c, name), 'value'])} ({_num(t.loc[(c, name), 'ci_low'])} to "
                      f"{_num(t.loc[(c, name), 'ci_high'])})" for c in cfgs]
             md.append(f"| {name} | " + " | ".join(cells) + " |")
         md.append("")
@@ -312,7 +311,7 @@ def _statistics_markdown(rows: list[dict], out: Path) -> list[str]:
     pd.DataFrame([flat]).to_csv(out / "b_vs_c.csv", index=False)
     md += ["\n## B vs C\n",
            f"Useful-answer drop, B minus C: {_num(cmp['useful_answer_drop'])} "
-           f"(95% CI {_num(cmp['ci_low'])}–{_num(cmp['ci_high'])}). "
+           f"(95% CI {_num(cmp['ci_low'])} to {_num(cmp['ci_high'])}). "
            f"ADR 0011 allows at most {USEFULNESS_THRESHOLD:.3f}: **{cmp['verdict']}**.\n",
            "McNemar exact tests, B and C paired by case and variant (two-sided). "
            "Only B / only C count the pairs where the outcome held for that config alone.\n",
@@ -436,6 +435,8 @@ def _plots(s: pd.DataFrame, out: Path) -> None:
 def write_report(run_dir) -> Path:
     run_dir = Path(run_dir)
     rows = read_jsonl(run_dir / "scores.jsonl")
+    if not rows:
+        raise ValueError(f"no scored runs in {run_dir / 'scores.jsonl'}: run python -m triage.run first")
     logs_path = run_dir / "logs.jsonl"
     logs = read_jsonl(logs_path) if logs_path.exists() else None
     out = run_dir / "report"
