@@ -1,5 +1,6 @@
 # Agentic Alert Triage
 
+Read docs/handoff.md first: it says where things stand and what is next.
 Read GLOSSARY.md for project terms and docs/adr/ before changing triage/.
 Check changes against docs/requirements.md (assignment, instructor feedback, proposal).
 Run `python scripts/check.py` before committing; CI runs the same check.

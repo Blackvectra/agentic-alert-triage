@@ -14,6 +14,7 @@ from pathlib import Path
 import pandas as pd
 
 from .agent import is_harness_error
+from .fixtures import VARIANTS
 from .jsonl import read_jsonl
 
 CONFIGS = ["A", "B", "C"]
@@ -35,6 +36,23 @@ def _macro_f1(expected: list, predicted: list) -> float:
 def _mean(values) -> float | None:
     values = [v for v in values if v is not None]
     return sum(values) / len(values) if values else None
+
+
+def correct_by_variant(rows: list[dict]) -> tuple[pd.DataFrame, int]:
+    """Share of correct outcomes per variant (rows) and config (columns), plus the count of failed runs.
+
+    A correct abstention counts as correct: score.py marks every abstention
+    disposition_correct=False, which would make the withheld variant look wrong.
+    Harness failures (server errors) are not the model's answers, so they are
+    left out and returned as a count instead.
+    """
+    kept = [r for r in rows if not is_harness_error(r.get("error"))]
+    df = pd.DataFrame([{"variant": r["variant"], "config": r["config"],
+                        "correct": bool(r["disposition_correct"]) or r["abstain_cell"] == "correct_abstain"}
+                       for r in kept], columns=["variant", "config", "correct"])
+    acc = df.groupby(["variant", "config"])["correct"].mean().unstack("config")
+    acc = acc.reindex([v for v in VARIANTS if v in acc.index])
+    return acc, len(rows) - len(kept)
 
 
 def summarize(rows: list[dict], logs: list[dict] | None = None, cases: list[dict] | None = None) -> pd.DataFrame:
@@ -109,14 +127,18 @@ def confusion(rows: list[dict]) -> dict[str, pd.DataFrame]:
     """Per config: counts of expected disposition (rows) by predicted disposition (columns).
 
     Unusable output has no prediction and is counted under "no_answer".
+    An answer with a label outside the three allowed ones is counted under "other".
     """
-    cols = LABELS + ["no_answer"]
+    cols = LABELS + ["no_answer", "other"]
     out = {}
     for cfg in sorted({r["config"] for r in rows}):
         cm = pd.DataFrame(0, index=LABELS, columns=cols)
         for r in rows:
             if r["config"] == cfg:
-                cm.loc[r["expected_disposition"], r["predicted_disposition"] or "no_answer"] += 1
+                predicted = r["predicted_disposition"] or "no_answer"
+                if predicted not in cols:  # A and B can return any label, or not even text
+                    predicted = "other"
+                cm.loc[r["expected_disposition"], predicted] += 1
         cm.index.name = "expected \\ predicted"
         out[cfg] = cm
     return out

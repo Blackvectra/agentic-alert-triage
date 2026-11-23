@@ -146,3 +146,19 @@ def test_log_says_refusals_were_not_measured_for_a_local_model():
     case, view = auth_001()
     log = run_case(case, "complete", "B", model(FakePost([text_reply(ANSWER)])), view)
     assert log["refusals_measured"] is False
+
+
+def test_qwen3_requests_turn_thinking_off_and_log_it():
+    post = FakePost([text_reply("{}")])
+    m = OllamaModel(model_id="qwen3:32b", post=post)
+    m.step("sys", USER_MSG, None)
+    assert post.requests[0][1]["think"] is False
+    assert m.settings["think"] is False
+
+
+def test_models_without_thinking_get_no_think_field():
+    post = FakePost([text_reply("{}")])
+    m = model(post)
+    m.step("sys", USER_MSG, None)
+    assert "think" not in post.requests[0][1]
+    assert "think" not in m.settings

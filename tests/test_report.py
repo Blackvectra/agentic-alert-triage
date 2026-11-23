@@ -92,6 +92,16 @@ def test_confusion_matrix_counts_expected_versus_predicted_per_config():
     assert int(cm.values.sum()) == 3                     # config B rows not counted here
 
 
+def test_confusion_matrix_counts_unknown_labels_under_other():
+    # A and B keep answers that fail the schema, so any label can reach the report.
+    rows = [row(expected="true_positive", predicted="malicious"),
+            row(expected="benign", predicted=["benign"])]
+    cm = report.confusion(rows)["B"]
+    assert cm.loc["true_positive", "other"] == 1
+    assert cm.loc["benign", "other"] == 1
+    assert int(cm.values.sum()) == 2
+
+
 def test_write_report_includes_confusion_matrices(tmp_path):
     rows = [row(config=c) for c in "ABC"]
     (tmp_path / "scores.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
@@ -179,3 +189,19 @@ def test_harness_errors_are_counted_apart_from_the_models_own_outcomes():
             row(config="C", error="budget_exhausted_without_answer", output_valid=False),  # model's result
             row(config="C")]
     assert report.summarize(rows).loc["C", "harness_errors"] == 1
+
+
+def test_correct_by_variant_counts_correct_abstentions_and_drops_harness_errors():
+    rows = [row(config="B", predicted="true_positive"),                       # right
+            row(config="B", predicted="benign"),                              # wrong
+            row(config="C", predicted="true_positive", error="HTTP 500"),     # harness failure: left out
+            row(config="C", predicted="benign", error="budget_exhausted_without_answer"),  # model's fault: kept, wrong
+            # Withheld: abstaining is correct even though disposition_correct is False.
+            row(config="B", variant="withheld", expected="needs_more_info", predicted="needs_more_info",
+                abstain_cell="correct_abstain")]
+    acc, failed = report.correct_by_variant(rows)
+    assert failed == 1
+    assert acc.loc["complete", "B"] == pytest.approx(0.5)
+    assert acc.loc["complete", "C"] == pytest.approx(0.0)
+    assert acc.loc["withheld", "B"] == pytest.approx(1.0)
+    assert list(acc.index) == ["complete", "withheld"]  # variants in the fixed order
