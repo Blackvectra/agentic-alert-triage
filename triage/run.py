@@ -15,8 +15,18 @@ import statistics
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .agent import (ANSWER_PARSER_VERSION, MAIN_CONFIGS, PROMPTS, Final, OllamaModel, ScriptedModel, ToolCall, is_harness_error,
-                    prompt_fingerprint, run_case)
+from .agent import (
+    ANSWER_PARSER_VERSION,
+    MAIN_CONFIGS,
+    PROMPTS,
+    Final,
+    OllamaModel,
+    ScriptedModel,
+    ToolCall,
+    is_harness_error,
+    prompt_fingerprint,
+    run_case,
+)
 from .fixtures import ROOT, VARIANTS, build_view, load_cases
 from .jsonl import read_jsonl
 from .score import score_run

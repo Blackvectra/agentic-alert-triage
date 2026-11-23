@@ -4,7 +4,13 @@ import json
 from pathlib import Path
 
 import triage.c2 as c2
-from triage.c2 import FALLBACK, answer_problems, known_bad_indicators, settle_answer, suspected_injections
+from triage.c2 import (
+    FALLBACK,
+    answer_problems,
+    known_bad_indicators,
+    settle_answer,
+    suspected_injections,
+)
 
 
 def _answer(claim_ids, action_ids=()):

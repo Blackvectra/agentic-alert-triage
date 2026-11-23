@@ -61,6 +61,7 @@ def test_event_search_description_says_there_is_no_host_filter():
 def test_event_search_description_names_exactly_the_filters_the_tool_accepts():
     # The description says these "are the only filters", so it must not drift from the schema.
     import re
+
     from triage.tools import TOOL_SPECS
     spec = TOOL_SPECS["event_search"]
     named = re.search(r"(\w+), (\w+) and (\w+) are the only filters", spec["description"]).groups()

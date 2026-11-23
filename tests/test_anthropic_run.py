@@ -5,10 +5,10 @@ Checks what a multi-turn run actually sends to the provider. No network, no key.
 import json
 from types import SimpleNamespace
 
+from test_anthropic_adapter import FakeClient, text_response
+
 from triage.agent import AnthropicModel, run_case
 from triage.fixtures import build_view, load_cases
-
-from test_anthropic_adapter import FakeClient, text_response
 
 ANSWER = json.dumps({"disposition": "true_positive", "abstain": False, "summary": "s",
                      "claims": [{"text": "c", "evidence_ids": ["E-EVT-001"]}], "proposed_actions": []})
