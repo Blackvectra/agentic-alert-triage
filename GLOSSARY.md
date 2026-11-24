@@ -121,6 +121,12 @@ ADR 0011's call on B's useful-answer rate minus C's, read from its 95% interval:
 **C2**:
 An exploratory guarded config designed after the held-out results (ADR 0012). It enforces in code the abstain and cite rules that C only asked for in its prompt. Reported separately from A, B and C as post-hoc.
 
+**C3**:
+An exploratory config: C2 with its "investigate first" layer replaced by the coverage rule (ADR 0013). Reported separately as post-hoc.
+
+**Coverage rule**:
+Before answering, look up every entity named in the alert and run one unfiltered event search on every user and IP in it. Built from the alert alone, never from the case's answers.
+
 **Spotlighting**:
 Marking tool output as untrusted data before the model reads it, so the model can tell retrieved content apart from its instructions.
 
