@@ -140,3 +140,44 @@ def settle_answer(answer, ask_again, retrieved_ids: set[str], records: list[dict
     if not second:
         return repaired, {"outcome": "repaired", "problems": [first]}
     return dict(FALLBACK), {"outcome": "fallback", "problems": [first, second]}
+
+
+# C3's coverage rule (ADR 0013): before answering, look up every entity the alert names and run
+# one unfiltered event_search on every user and IP in it. Built from the alert alone, so it can run
+# on real alerts; it never reads a case's answers.
+_IPV4 = re.compile(r"\d{1,3}(\.\d{1,3}){3}")
+
+
+def _alert_values(alert: dict) -> list[tuple[str, str]]:
+    """(field, value) for every entity value in the alert, list values one by one, in order."""
+    pairs = []
+    for field, value in (alert.get("entities") or {}).items():
+        for v in value if isinstance(value, list) else [value]:
+            pairs.append((field, str(v)))
+    return pairs
+
+
+def missing_coverage(alert: dict, tool_calls: list[dict]) -> list[str]:
+    """Name every lookup the coverage rule still needs. Empty means the rule is met.
+
+    Only executed calls count: a rejected call did not look at anything. Matching ignores case.
+    A search filtered by event_type does not count, because filtering hid the records that
+    cleared the alert in C2's misses.
+    """
+    ran = [c for c in tool_calls if c.get("executed")]
+    looked_up = {str(c["args"].get("id", "")).lower() for c in ran if c["name"] == "entity_lookup"}
+    unfiltered = [c["args"] for c in ran if c["name"] == "event_search" and not c["args"].get("event_type")]
+    searched = {(k, str(a[k]).lower()) for a in unfiltered for k in ("user", "src_ip") if a.get(k)}
+
+    pairs = list(dict.fromkeys(_alert_values(alert)))
+    missing = [f"entity_lookup id={v}" for _, v in pairs if v.lower() not in looked_up]
+    for field, v in pairs:
+        if field == "user" or "@" in v:
+            key = "user"
+        elif _IPV4.fullmatch(v):
+            key = "src_ip"
+        else:
+            continue
+        if (key, v.lower()) not in searched:
+            missing.append(f"event_search {key}={v} (no event_type filter)")
+    return missing

@@ -76,6 +76,7 @@ def test_indicator_code_names_no_case_and_no_expected_answer():
                 for p in Path("fixtures/cases").glob("*.json")]
     assert not [cid for cid in case_ids if cid in source]
     assert "expected_" not in source  # the fixtures' answer fields, e.g. expected_disposition
+    assert "required_evidence" not in source  # nor the answer key for what to retrieve (ADR 0013)
 
 
 # --- Repair turn: one chance to fix a failing answer, then needs_more_info ---
@@ -157,3 +158,60 @@ def test_a_record_fetched_twice_is_reported_once():
     records = [{"evidence_id": "E-3", "type": "mailbox_rule_created"}] * 2
     assert answer_problems(BENIGN, retrieved_ids={"E-3"}, records=records) == [
         "answered benign, but E-3 shows a known-bad sign: new inbox rule (persistence)"]
+
+
+# --- C3 coverage rule (ADR 0013): every alert entity looked up, every user and IP searched unfiltered ---
+from triage.c2 import missing_coverage  # noqa: E402
+
+ALERT = {"entities": {"user": "kim@example.org", "src_ip": "198.51.100.7", "host": "WS-01"}}
+
+
+def _call(name, **args):
+    return {"name": name, "args": args, "executed": True}
+
+
+FULL = [_call("entity_lookup", id="kim@example.org"), _call("entity_lookup", id="198.51.100.7"),
+        _call("entity_lookup", id="WS-01"), _call("event_search", user="kim@example.org"),
+        _call("event_search", src_ip="198.51.100.7")]
+
+
+def test_full_coverage_leaves_nothing_missing():
+    assert missing_coverage(ALERT, FULL) == []
+
+
+def test_each_missing_lookup_and_search_is_named():
+    missing = missing_coverage(ALERT, [_call("entity_lookup", id="kim@example.org")])
+    assert missing == ["entity_lookup id=198.51.100.7", "entity_lookup id=WS-01",
+                       "event_search user=kim@example.org (no event_type filter)",
+                       "event_search src_ip=198.51.100.7 (no event_type filter)"]
+
+
+def test_a_filtered_search_does_not_count():
+    calls = FULL[:3] + [_call("event_search", user="kim@example.org", event_type="signin"),
+                        _call("event_search", src_ip="198.51.100.7")]
+    assert missing_coverage(ALERT, calls) == ["event_search user=kim@example.org (no event_type filter)"]
+
+
+def test_a_rejected_call_does_not_count():
+    calls = FULL[:-1] + [dict(_call("event_search", src_ip="198.51.100.7"), executed=False)]
+    assert missing_coverage(ALERT, calls) == ["event_search src_ip=198.51.100.7 (no event_type filter)"]
+
+
+def test_matching_ignores_case_and_searching_user_and_ip_together_counts_for_both():
+    calls = FULL[:3] + [_call("event_search", user="KIM@example.org", src_ip="198.51.100.7")]
+    assert missing_coverage(ALERT, calls) == []
+
+
+def test_users_are_found_by_field_name_or_at_sign_and_list_values_one_by_one():
+    alert = {"entities": {"actor": "admin@example.org", "user": "NT AUTHORITY\\SYSTEM",
+                          "members": ["a@example.org", "GRP-1"], "app": "app-x"}}
+    missing = missing_coverage(alert, [])
+    searches = [m for m in missing if m.startswith("event_search")]
+    assert searches == ["event_search user=admin@example.org (no event_type filter)",
+                        "event_search user=NT AUTHORITY\\SYSTEM (no event_type filter)",
+                        "event_search user=a@example.org (no event_type filter)"]
+    assert len(missing) - len(searches) == 5  # one entity_lookup per value, GRP-1 and app-x included
+
+
+def test_an_alert_without_entities_needs_nothing():
+    assert missing_coverage({}, []) == []
