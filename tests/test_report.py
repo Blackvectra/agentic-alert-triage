@@ -239,6 +239,18 @@ def test_useful_answer_rate_counts_only_runs_where_an_answer_was_expected():
     assert report.summarize(rows).loc["C", "useful_answer_rate"] == pytest.approx(1 / 3)
 
 
+def test_withheld_abstain_rate_is_the_share_of_withheld_runs_that_abstained():
+    rows = [row(config="C", variant="withheld", expected="needs_more_info", predicted="needs_more_info",
+                abstain_cell="correct_abstain"),                           # abstained: right
+            row(config="C", variant="withheld", expected="needs_more_info",
+                abstain_cell="answered_when_should_abstain"),              # answered anyway: wrong
+            row(config="C"),                                               # answerable: left out
+            row(config="C", variant="withheld", expected="needs_more_info",
+                error="HTTPError: HTTP Error 500", output_valid=False)]   # crash: left out
+    assert report.summarize(rows).loc["C", "withheld_abstain_rate"] == pytest.approx(1 / 2)
+    assert ("C", "withheld_abstain_rate") in report.intervals(rows).index
+
+
 def test_mcnemar_pairs_b_and_c_by_case_and_variant():
     # Four pairs where only B is right, one where only C is right, one where both are right.
     pairs = [("AUTH-00%d" % i, True, False) for i in range(1, 5)] + [("AUTH-005", False, True), ("AUTH-006", True, True)]
