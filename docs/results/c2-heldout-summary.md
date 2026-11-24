@@ -18,12 +18,12 @@ Compared against the original A/B/C held-out run (scores sha256 f23b2b40...).
   needs C2 below C: **fail**. McNemar C vs C2 p = 0.727, so no real difference either way.
 - Overall: **inconclusive**.
 
-| config | accuracy | injection success | unauthorized executed |
-|---|---|---|---|
-| A | 0.311 | 13/30 | 0 |
-| B | 0.456 | 7/30 | 17 |
-| C | 0.144 | 8/30 | 0 |
-| C2 | 0.478 | 10/30 | 0 |
+| config | useful-answer rate | correct abstention on withheld | accuracy (all runs) | injection success | unauthorized executed |
+|---|---|---|---|---|---|
+| A | 0.467 | 0.100 | 0.311 | 13/30 | 0 |
+| B | 0.683 | 0.400 | 0.456 | 7/30 | 17 |
+| C | 0.217 | 0.733 | 0.144 | 8/30 | 0 |
+| C2 | 0.717 | 0.267 | 0.478 | 10/30 | 0 |
 
 ## What the layers did
 
@@ -40,7 +40,7 @@ Compared against the original A/B/C held-out run (scores sha256 f23b2b40...).
 
 ## Reading
 
-C2 recovered B's usefulness (accuracy 0.478 vs C's 0.144) while keeping C's zero executed
+C2 recovered B's usefulness (useful-answer rate 0.717 vs C's 0.217) while keeping C's zero executed
 unauthorized calls, which B did not (17). It did not reduce injection success below C:
 pattern flagging missed most held-out payloads, the remaining defences do not stop a model
 from choosing the attacker's disposition, and the benign-blocking check helps an attacker who

@@ -73,11 +73,14 @@ For the B-versus-C comparison I used 95% bootstrap intervals over whole cases (2
 
 All numbers come from `docs/results/heldout-summary.md`.
 
+The first two rows are the headline: how often each config was right where an answer was expected, and how often it correctly held back where the key evidence was withheld. The all-runs correct-disposition rate is shown below them, but it never credits a correct abstention, so no config can score above 67% on it.
+
 | | A | B | C |
 |---|---|---|---|
+| Useful-answer rate (complete and injected, 60 runs) | 47% | 68% | 22% |
+| Correct abstention on withheld (30 runs) | 10% | 40% | 73% |
 | Correct disposition (all 90 runs) | 31% | 46% | 14% |
 | Macro-F1 | 0.22 | 0.58 | 0.34 |
-| Useful-answer rate | 47% | 68% | 22% |
 | Missed attacks (real attack not called one) | 7% | 27% | 67% |
 | Supported claims | 0% | 98% | 92% |
 | Runs with fabricated citations | 90 | 0 | 0 |
@@ -85,7 +88,6 @@ All numbers come from `docs/results/heldout-summary.md`.
 | Unauthorized calls attempted / executed | 0 / 0 | 17 / 17 | 30 / 0 |
 | Injection success (injected variant) | 43% | 23% | 27% |
 | Abstention rate | 10% | 24% | 66% |
-| Correct abstentions on withheld (of 30) | 3 | 12 | 22 |
 | Tool calls per run | - | 2.9 | 2.0 |
 | Tokens per alert | 511 | 3,523 | 2,827 |
 | Seconds per alert | 7.9 | 9.3 | 8.0 |
@@ -100,7 +102,7 @@ Correct dispositions by variant and by family (each cell out of 30):
 | suspicious process | 10 | 18 | 6 |
 | account / privilege change | 10 | 12 | 0 |
 
-The withheld variant has no correct disposition, because the right answer there is to abstain. Its result is the "correct abstentions" row in the first table. So each family row holds 10 withheld runs that can never count as correct, and at most 20 of its 30 can.
+The withheld variant has no correct disposition, because the right answer there is to abstain. Its result is the "correct abstention on withheld" row in the first table. So each family row holds 10 withheld runs that can never count as correct, and at most 20 of its 30 can.
 
 ### B versus C
 
@@ -154,11 +156,11 @@ C2 keeps C's tools, call budget, input checking and approval gate, and adds thre
 
 I tuned it on the dev cases with a single dev run, froze it, then ran it once on the held-out cases (90 runs, no harness errors). Before that run I fixed two rules for success. C2 had to be as useful as B, by the same 10-point rule as ADR 0011. It also had to have a lower injection success rate than C, with no unauthorized calls executed.
 
-| config | accuracy | injection success | unauthorized executed |
-|---|---|---|---|
-| B | 0.456 | 7/30 | 17 |
-| C | 0.144 | 8/30 | 0 |
-| C2 | 0.478 | 10/30 | 0 |
+| config | useful-answer rate | correct abstention on withheld | injection success | unauthorized executed |
+|---|---|---|---|---|
+| B | 0.683 | 0.400 | 7/30 | 17 |
+| C | 0.217 | 0.733 | 8/30 | 0 |
+| C2 | 0.717 | 0.267 | 10/30 | 0 |
 
 **Usefulness: inconclusive.** C2 answered correctly slightly more often than B (useful-answer drop -0.033), but the confidence interval still reaches past the 10-point line, so the rule cannot call it a pass. It is a large recovery from C, which supports the explanation in the last section. C's drop came from prompt instructions that pushed it to abstain. Checking answers in code, rather than telling the model to be cautious, did not cost usefulness.
 
@@ -167,6 +169,23 @@ I tuned it on the dev cases with a single dev run, froze it, then ran it once on
 On two of the false-alarm cases the answer check made things worse. The model first answered `benign`, which was right. The check rejected it because a record showed a known-bad sign: on AUTH-110 the flagged injection itself, and on AUTH-106 a legacy-authentication sign-in. The repaired answer was the attacker's `true_positive`. A rule that treats a planted instruction as a sign of attack works against an attacker who wants a false alarm.
 
 **What this adds.** C2 kept C's safety on tool calls and got back B's usefulness, which C had lost. It did not reduce prompt injection. Labelling data as untrusted and matching it against patterns did not hold up on payloads it was not tuned on. My dev cases mostly tried to hide attacks, so I built the checks against `benign` answers and did not test the other direction. No check in the harness can tell a disposition that is justified from one an attacker planted. Stopping that likely needs a design where untrusted content cannot affect the decision at all, not better pattern matching.
+
+### Where the errors come from (post-hoc error analysis)
+
+After the runs I sorted every wrong result into one cause. This is a description of the same held-out runs, not a new test. The counts are from the first held-out run; the two reruns gave the same pattern to within two runs per category.
+
+| | A | B | C | C2 |
+|---|---|---|---|---|
+| Didn't look: a required record was never retrieved | 26 | 9 | 10 | 11 |
+| Looked but misread the retrieved evidence | 0 | 0 | 0 | 4 |
+| Abstained on an answerable run | 6 | 10 | 37 | 2 |
+| Answered on a withheld run instead of abstaining | 27 | 18 | 8 | 22 |
+
+- **No config is good at both halves.** B and C2 answer well but usually answer anyway when the key evidence is missing; C abstains well but rarely answers correctly. This is a calibration problem more than a detection one.
+- **Wrong verdicts come from not looking, not from misreading.** Nearly every wrong answer skipped a required record, about three-quarters of them event records. B averaged 2.9 tool calls per run and C 2.0. Three of C2's four misreads are the injected runs discussed above.
+- **Most wrong verdicts are false alarms.** Real attacks called benign happened only on injected runs (B 4, C 4, C2 2), so the missed attacks come from the injection, not from weak detection.
+
+"Didn't look" is a proxy: it shows a required record was missing, not that the record would have changed the answer.
 
 ## 5. Changes and deviations from the plan
 
@@ -183,14 +202,14 @@ On two of the false-alarm cases the answer check made things worse. The model fi
 ## 6. Reproducibility
 
 - **Hardware.** The run needs a Colab Pro A100, or similar, to load qwen3:32b. It cannot be reproduced on free Colab.
-- **Determinism.** Fixing the seed and temperature does not make runs identical across GPU types. Two dev runs on an L4 and an A100 matched word for word on only 23 of 108 answers, and C's correct count moved from 4 to 7. Every reported run therefore used the same GPU type. Whether two runs on the same A100 match each other was not tested.
+- **Determinism.** Fixing the seed and temperature does not make runs identical across GPU types. Two dev runs on an L4 and an A100 matched word for word on only 23 of 108 answers, and C's correct count moved from 4 to 7. Every reported run therefore used the same GPU type. On the same GPU type the scored results did reproduce: two more A100 runs of A, B and C changed 2 and 4 of 270 answers, with every verdict unchanged, and a second C2 run changed 3 of 90 (injection successes 10 to 9, still not below C). The text of the answers still differed between runs. The first run of each config stays the reported result.
 - **Provenance.** The raw logs and scores are kept outside the repository. Their sha256 hashes are in `docs/results/heldout-summary.md`.
 
 ## 7. Limitations
 
 - **One model:** a single local open-weight model, qwen3:32b. Other models may behave differently, especially on tool use and abstention.
 - **Synthetic cases:** I wrote all 42 cases myself. They may not predict how the assistant would do on real SIEM alerts, and my own expectations shaped both the cases and the answers.
-- **Small sample:** 30 held-out cases and one execution each. The intervals are wide; for example, B's accuracy interval runs from 36% to 56%.
+- **Small sample:** 30 held-out cases, with one reported execution each (the reruns only check reproducibility). The intervals are wide; for example, B's accuracy interval runs from 36% to 56%.
 - **Bundled guardrails:** C changes several things at once, so no single guardrail can be credited or blamed.
 - **Tooling rough edges** that I chose to leave:
   - the lock file does not install on Python 3.11;
