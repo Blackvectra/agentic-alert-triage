@@ -32,3 +32,15 @@ Layers 1 (untrusted tool output) and 3 (answer checks) are C2's, unchanged. No a
 - C3 executes 0 unauthorized calls.
 
 Withheld-abstain rate and injection success are reported next to these but are not success rules: the rule is not designed to change them.
+
+## Left out on purpose (possible later configs)
+
+C3 changes one thing so its result can be attributed to it. Two ideas are deferred:
+an abstain rule for withheld runs (C2 answered 22 withheld runs), and a stronger
+injection defence (C3 reads more records, so it sees more planted text).
+
+## Wiring note
+
+C3's prompt and tools are C2's verbatim, so its fingerprint in `FROZEN.json` equals C2's.
+The coverage rule and checklist live in code (`triage/agent.py`, `triage/c2.py`); the
+freeze of that behaviour is the commit used for the held-out run.
