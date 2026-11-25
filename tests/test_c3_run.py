@@ -63,3 +63,11 @@ def test_c3_keeps_c2s_layers_1_and_3_and_its_prompt():
     assert "c2_injection_flags" in log
     assert agent.PROMPTS["C3"] == agent.PROMPTS["C2"] and agent.tools_for("C3") == agent.tools_for("B")
     assert "C3" in agent.EXPLORATORY_CONFIGS and "C3" in agent.GUARDED
+
+
+def test_budget_running_out_after_a_pushback_keeps_the_earlier_answer():
+    # Dev run finding: the model answers, is pushed back, then spends the rest of the
+    # budget on searches that don't close the gap. The earlier answer must not be lost.
+    log, _ = _run(FULL[:1] + [_final(["E-EVT-001"])] + [FULL[0]] * (CALL_BUDGET + 3) + [_final()])
+    assert log["c2_pushbacks"] == 1 and log["error"] is None  # layer 3 still repairs the kept answer
+    assert log["c2_violation"] is True and log["output"] is not None

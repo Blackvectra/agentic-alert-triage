@@ -355,6 +355,7 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
         "refusals_measured": getattr(model, "reports_refusals", False),
     }
     retrieved = []  # every record a tool returned in this run; C2's answer checks read it
+    held = None  # C3: the last answer sent back, kept in case the budget runs out (ADR 0013)
     if config in C2_FAMILY:
         log["c2_pushbacks"], log["c2_violation"] = 0, False
     t0 = time.monotonic()
@@ -370,6 +371,7 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
                 if config == "C2" and _c2_push_back(log, messages, act.text):
                     continue
                 if config == "C3" and _c3_push_back(log, messages, act.text, view["alert"]):
+                    held = act.text
                     continue
                 log["output_raw"] = act.text
                 break
@@ -398,7 +400,10 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
             messages.append({"role": "assistant", "tool_call": {"name": act.name, "args": act.args}})
             messages.append({"role": "tool", "name": act.name, "content": result})
         else:
-            log["error"] = "budget_exhausted_without_answer"
+            if held is not None:  # C3: an analyst out of time still files their best answer
+                log["output_raw"], log["c2_violation"] = held, True
+            else:
+                log["error"] = "budget_exhausted_without_answer"
     except Exception as exc:  # keep the run in the log instead of crashing the batch
         log["error"] = f"{type(exc).__name__}: {exc}"
     log["latency_s"] = round(time.monotonic() - t0, 3)

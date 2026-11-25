@@ -46,3 +46,15 @@ injection defence (C3 reads more records, so it sees more planted text).
 C3's prompt and tools are C2's verbatim, so its fingerprint in `FROZEN.json` equals C2's.
 The coverage rule and checklist live in code (`triage/agent.py`, `triage/c2.py`); the
 freeze of that behaviour is the commit used for the held-out run.
+
+## Dev-run finding: keep the last answer (2026-11-25)
+
+The first C3 dev run (36 runs, fingerprint `bcb8d372`) pushed back on every run, and 4 runs
+(PRIV-001 and PROC-004, complete and injected) ended as `budget_exhausted_without_answer`:
+after a push-back the model spent its remaining calls on filtered searches that do not count
+toward coverage, and the answer it had already given was discarded. C3 now keeps the last
+answer it sent back; if the budget runs out without a new one, that answer is used and the
+run is logged as a violation (`c2_violation`). Prompts and tools are unchanged, so the
+fingerprint is unchanged. That run also showed injection success of 7 of 12 against C2's
+4 of 12 on dev: making the model read every record exposes it to more injected text. The fix
+does not address this; it is reported, not tuned away.
