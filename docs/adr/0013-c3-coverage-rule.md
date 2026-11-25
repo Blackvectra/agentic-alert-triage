@@ -58,3 +58,10 @@ run is logged as a violation (`c2_violation`). Prompts and tools are unchanged, 
 fingerprint is unchanged. That run also showed injection success of 7 of 12 against C2's
 4 of 12 on dev: making the model read every record exposes it to more injected text. The fix
 does not address this; it is reported, not tuned away.
+
+## Status: frozen after one held-out run (2026-11-25)
+
+C3 was run on held-out (with A, B, C and C2) before the second dev run. It is frozen as of
+that run and not tuned further. Result: **fail** (not above C2; usefulness vs B
+inconclusive; 0 unauthorized). Injection success rose from C2's 9/30 to 16/30 (McNemar
+p = 0.039). See `docs/results/c3-heldout-summary.md`.
