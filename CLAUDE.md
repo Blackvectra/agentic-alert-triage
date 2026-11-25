@@ -8,6 +8,7 @@ After a PR merges (squash or merge commit), run `scripts/resync_after_merge.sh`;
 
 - Read-only and simulated: tools never write; the approval gate never executes.
 - Scoring rules (triage/score.py) and each case's expected answers are the user's ground truth: ask before changing them.
+- Case facts (expected answers, planted injections): read them with `python scripts/case.py <id>`, never from memory.
 - B and C keep identical tools and call budget (ADR 0001).
 - API keys come from environment variables only; never in code, logs or commits.
 - The user is learning Python: before each change, say what and why in plain words; one small commit, then stop for review, unless the user asks for a batch (then keep commits small and review together at the end).

@@ -15,13 +15,23 @@ import statistics
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .agent import (ANSWER_PARSER_VERSION, Final, OllamaModel, ScriptedModel, ToolCall, is_harness_error,
-                    prompt_fingerprint, run_case)
+from .agent import (
+    ANSWER_PARSER_VERSION,
+    MAIN_CONFIGS,
+    PROMPTS,
+    Final,
+    OllamaModel,
+    ScriptedModel,
+    ToolCall,
+    is_harness_error,
+    prompt_fingerprint,
+    run_case,
+)
 from .fixtures import ROOT, VARIANTS, build_view, load_cases
 from .jsonl import read_jsonl
 from .score import score_run
 
-CONFIGS = ("A", "B", "C")
+CONFIGS = MAIN_CONFIGS  # default run; C2 only with --configs
 PLANNED_HELDOUT_CASES = 30  # the proposal's held-out set: 30 x 3 variants x 3 configs = 270 runs
 RUNS_PER_CASE = len(VARIANTS) * len(CONFIGS)
 DRY_RUN_CASE = "AUTH-001"
@@ -86,7 +96,9 @@ def _prepare_resume(out_dir: Path) -> set:
     scored = {_key(s) for s in scores}
     # Done = scored, no harness error, made with the current prompts and tools, and read by
     # the current answer parser (a log from before the version was recorded has none).
-    current = {cfg: prompt_fingerprint(cfg) for cfg in CONFIGS}
+    # Every known config, not only the ones planned now: a C2 run saved in this folder must
+    # survive a later A/B/C run (ADR 0012).
+    current = {cfg: prompt_fingerprint(cfg) for cfg in PROMPTS}
     done = {_key(l) for l in logs
             if _key(l) in scored and not is_harness_error(l["error"])
             and l.get("prompt_sha256") == current.get(l["config"])
@@ -145,7 +157,13 @@ def main(argv=None) -> None:
     ap.add_argument("--dry-run", action="store_true", help=f"run {DRY_RUN_CASE} only and project to the held-out pass")
     ap.add_argument("--price-in", type=float, help="USD per million input tokens (paid models only)")
     ap.add_argument("--price-out", type=float, help="USD per million output tokens (paid models only)")
+    ap.add_argument("--configs", default=",".join(CONFIGS),
+                    help="comma-separated configs to run (default: A,B,C; the exploratory C2 only on request)")
     args = ap.parse_args(argv)
+    configs = tuple(c.strip() for c in args.configs.split(","))
+    unknown = [c for c in configs if c not in PROMPTS]
+    if unknown:
+        raise SystemExit(f"unknown config(s) {', '.join(unknown)}: choose from {', '.join(PROMPTS)}")
 
     make_model = get_model(args.model, args.host)
     if args.out:
@@ -165,7 +183,7 @@ def main(argv=None) -> None:
 
     done = _prepare_resume(out_dir)
     new_logs = []
-    planned = [(case["case_id"], variant, config) for case in cases for variant in VARIANTS for config in CONFIGS]
+    planned = [(case["case_id"], variant, config) for case in cases for variant in VARIANTS for config in configs]
     total = len(planned)
     # Start from what an earlier session already finished, so the counter and the time left
     # only ever count runs that are still to do.
@@ -174,7 +192,7 @@ def main(argv=None) -> None:
         for case in cases:
             for variant in VARIANTS:
                 view = build_view(case, variant)
-                for config in CONFIGS:
+                for config in configs:
                     if (case["case_id"], variant, config) in done:
                         continue
                     log = run_case(case, variant, config, make_model(), view)  # fresh model per run

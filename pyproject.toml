@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = ["jsonschema>=4.23"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3", "nbclient>=0.10", "ipykernel>=6.29", "nbformat>=5.10"]
+dev = ["pytest>=8.3", "ruff==0.17.6", "nbclient>=0.10", "ipykernel>=6.29", "nbformat>=5.10"]
 notebook = ["jupyterlab>=4.2", "pandas>=2.2", "matplotlib>=3.8", "plotly>=5.20"]
 report = ["pandas>=2.2", "matplotlib>=3.8", "plotly>=5.20"]
 # Optional paid model; the experiment itself uses a free local model via Ollama (ADR 0004).
@@ -22,3 +22,8 @@ packages = ["triage"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+# Small on purpose: catch leftovers (unused imports and names, undefined names) and keep
+# imports sorted. Pinned in [dev] so a ruff upgrade can't turn CI red on its own.
+lint.select = ["F", "I"]

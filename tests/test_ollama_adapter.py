@@ -162,3 +162,21 @@ def test_models_without_thinking_get_no_think_field():
     m.step("sys", USER_MSG, None)
     assert "think" not in post.requests[0][1]
     assert "think" not in m.settings
+
+
+def test_c2_push_back_reaches_ollama_as_plain_messages():
+    # C2 sends an early answer back (ADR 0012). That answer is text, not a tool call, so it must
+    # be replayed as text; the first C2 dev run crashed here with IndexError on 33 of 36 runs.
+    case, view = auth_001()
+    post = FakePost([text_reply("too early"),
+                     tool_reply(("event_search", {"user": "jdoe@example.org"})),
+                     tool_reply(("entity_lookup", {"id": "jdoe@example.org"})),
+                     text_reply(ANSWER)])
+
+    log = run_case(case, "complete", "C2", model(post), view)
+
+    assert log["error"] is None and log["c2_pushbacks"] == 1
+    msgs = post.requests[1][1]["messages"]
+    assert [m["role"] for m in msgs] == ["system", "user", "assistant", "user"]
+    assert msgs[2]["content"] == "too early"
+    assert "investigate first" in msgs[3]["content"]
