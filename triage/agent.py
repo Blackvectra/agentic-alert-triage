@@ -359,7 +359,8 @@ def _guard_code_sha256(config: str = "C2") -> str:
     parts.append(repr((C2_MUST_CALL, MAX_PUSHBACKS, INVESTIGATE_FIRST)))
     if config == "C4":
         # C4's guards live in triage/c4.py and in the run loop, so both are covered.
-        parts += [Path(c4.__file__).read_text(encoding="utf-8"), inspect.getsource(run_case)]
+        parts.append(Path(c4.__file__).read_text(encoding="utf-8"))
+        parts += [inspect.getsource(f) for f in (run_case, _settle_c4)]
     return hashlib.sha256("\n".join(parts).replace("\r\n", "\n").encode()).hexdigest()
 
 
@@ -432,7 +433,9 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
     log["latency_s"] = round(time.monotonic() - t0, 3)
     log["stop_reasons"] = list(getattr(model, "stop_reasons", []))
     _parse_output(log, config)
-    if config in C2_FAMILY and not log["error"]:
+    if config == "C4" and not log["error"]:
+        _settle_c4(log, model, messages, retrieved, view["alert"])
+    elif config in C2_FAMILY and not log["error"]:
         _settle_c2(log, model, messages, retrieved, config)
     if config in GUARDED and log["output"]:
         log["gate"] = [gate.request_approval(a) for a in log["output"].get("proposed_actions", [])]
@@ -502,6 +505,30 @@ def _settle_c2(log: dict, model, messages: list, retrieved: list, config: str = 
                                  for eid, field in dict.fromkeys(c2.suspected_injections(retrieved))]
     log["output"], log["c2_check"] = c2.settle_answer(
         log["output"], ask_again, {r["evidence_id"] for r in retrieved}, retrieved)
+
+
+def _settle_c4(log: dict, model, messages: list, retrieved: list, alert: dict) -> None:
+    """C4 layer 3 (ADR 0014): C2's checks plus missing-evidence abstain, with one repair turn.
+
+    A separate copy of _settle_c2, so that changing C4 never changes C2's or C3's fingerprint.
+    """
+    def ask_again(feedback: str):
+        convo = messages + [{"role": "assistant", "content": log["output_raw"]},
+                            {"role": "user", "content": feedback}]
+        act, usage = model.step(PROMPTS["C4"], convo, tools_for("C4"))
+        log["input_tokens"] += usage.input_tokens
+        log["output_tokens"] += usage.output_tokens
+        if not isinstance(act, Final):
+            return None
+        repair = {"output_raw": act.text}
+        _parse_output(repair, "C4")
+        return repair["output"]
+
+    log["c2_injection_flags"] = [{"evidence_id": eid, "field": field}
+                                 for eid, field in dict.fromkeys(c2.suspected_injections(retrieved))]
+    log["c4_empty_lookups"] = c4.empty_lookups(alert, log["tool_calls"])  # guard 1
+    log["output"], log["c2_check"] = c4.settle_answer(
+        log["output"], ask_again, {r["evidence_id"] for r in retrieved}, retrieved, log["c4_empty_lookups"])
 
 
 def _strip_code_fence(raw: str) -> str:

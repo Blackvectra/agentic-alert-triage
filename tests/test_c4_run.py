@@ -33,3 +33,20 @@ def test_c4_keeps_c3s_layers():
     log = _run([_final()] + FULL + [_final(evidence_ids=["E-EVT-001"])])
     assert log["c2_pushbacks"] == 1 and log["c2_check"]["outcome"] == "accepted"
     assert "c2_injection_flags" in log and log["error"] is None
+
+
+# Guard 1, missing-evidence abstain. AUTH-001's withheld variant has no directory record for the user.
+def test_withheld_evidence_turns_a_verdict_into_a_repair_request():
+    log = _run(FULL + [_final(evidence_ids=["E-EVT-001"]), _final("needs_more_info")], variant="withheld")
+    assert log["c4_empty_lookups"] == [f"entity_lookup id={USER} found nothing"]
+    assert log["c2_check"]["outcome"] == "repaired" and log["output"]["disposition"] == "needs_more_info"
+
+
+def test_a_verdict_kept_despite_the_gap_falls_back_to_needs_more_info():
+    log = _run(FULL + [_final(evidence_ids=["E-EVT-001"])] * 2, variant="withheld")
+    assert log["c2_check"]["outcome"] == "fallback" and log["output"] == agent.c4.FALLBACK
+
+
+def test_complete_evidence_has_no_gap():
+    log = _run(FULL + [_final(evidence_ids=["E-EVT-001"])])
+    assert log["c4_empty_lookups"] == [] and log["c2_check"]["outcome"] == "accepted"
