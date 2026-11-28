@@ -34,7 +34,6 @@ from .score import score_run
 
 CONFIGS = MAIN_CONFIGS  # default run; the exploratory C2, C3 and C4 only with --configs
 PLANNED_HELDOUT_CASES = 30  # the proposal's held-out set: 30 x 3 variants x 3 configs = 270 runs
-RUNS_PER_CASE = len(VARIANTS) * len(CONFIGS)
 DRY_RUN_CASE = "AUTH-001"
 
 
@@ -120,10 +119,11 @@ def _prepare_resume(out_dir: Path) -> set:
 
 
 def _print_projection(logs: list[dict], price_in: float | None, price_out: float | None,
-                      heldout_cases: int) -> None:
+                      heldout_cases: int, configs: tuple[str, ...]) -> None:
+    """Scale the dry run up to a held-out pass of the same configs (A,B,C: 270 runs; all six: 540)."""
     n = len(logs)
     print(f"\n{'config':6} {'runs':>4} {'in tok/run':>11} {'out tok/run':>12} {'sec/run':>8} {'steps/run':>10}")
-    for cfg in CONFIGS:
+    for cfg in configs:
         rs = [l for l in logs if l["config"] == cfg]
         if not rs:
             continue
@@ -135,7 +135,7 @@ def _print_projection(logs: list[dict], price_in: float | None, price_out: float
         cases, label = heldout_cases, f"{heldout_cases} held-out cases"
     else:
         cases, label = PLANNED_HELDOUT_CASES, f"planned {PLANNED_HELDOUT_CASES} held-out cases; none written yet"
-    target = cases * RUNS_PER_CASE
+    target = cases * len(VARIANTS) * len(configs)
     scale = target / n
     tin = sum(l["input_tokens"] for l in logs) * scale
     tout = sum(l["output_tokens"] for l in logs) * scale
@@ -213,7 +213,7 @@ def main(argv=None) -> None:
     if failed:
         print(f"WARNING: {failed} harness errors; rerun the same --out to retry")
     if args.dry_run and new_logs:
-        _print_projection(new_logs, args.price_in, args.price_out, len(load_cases("heldout")))
+        _print_projection(new_logs, args.price_in, args.price_out, len(load_cases("heldout")), configs)
 
 
 if __name__ == "__main__":
