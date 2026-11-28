@@ -3,6 +3,10 @@
 C2 was designed after the A/B/C held-out results were seen, so these numbers are exploratory
 and likely optimistic (holdout reuse). The main conclusion stays with `heldout-summary.md`.
 
+**Superseded code (2026-11-28).** C2's code changed after these runs (generic layer-1 patterns;
+fingerprint now covers code; ADR 0012). These results stay as the result of the old code; the
+re-run is filed separately.
+
 Run: 2026-11-24, qwen3:32b, think off, temperature 0, seed 672, C2 frozen at `bcb8d372fc`.
 90 runs (30 held-out cases x 3 variants), 0 harness errors. GPU type not recorded in the logs.
 Raw files in Google Drive (ee672_runs/heldout_ollama-qwen3-32b_C2):

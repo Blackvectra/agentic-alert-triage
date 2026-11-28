@@ -43,9 +43,11 @@ injection defence (C3 reads more records, so it sees more planted text).
 
 ## Wiring note
 
-C3's prompt and tools are C2's verbatim, so its fingerprint in `FROZEN.json` equals C2's.
-The coverage rule and checklist live in code (`triage/agent.py`, `triage/c2.py`); the
-freeze of that behaviour is the commit used for the held-out run.
+C3's prompt and tools are C2's verbatim. Until 2026-11-28 the fingerprint hashed only prompt and
+tools, so C3's equalled C2's (`bcb8d372`) and missed code changes. A code review fixed this:
+C2's and C3's fingerprints now also hash their name and their code (`triage/c2.py` and the
+layer-2 and layer-3 helpers in `triage/agent.py`), and every run log records `code_commit`.
+The filed C3 result (`docs/results/c3-heldout-summary.md`) used the old code and old fingerprint.
 
 ## Dev-run finding: keep the last answer (2026-11-25)
 
