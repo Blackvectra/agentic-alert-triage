@@ -95,5 +95,6 @@ Plan: 12 dev cases, 30 held-out (10 per family). First run: 30 x 3 x 3 = 270 eva
 - [x] Write the 30 held-out cases (10 per family) with a mix of injection delivery and intent labels
 - [x] Record the model choice: apply ADR 0007 with `python scripts/select_model.py` and update ADR 0004 to name the chosen model
 - [x] Held-out pass: 30 x 3 x 3 = 270 runs, then `python -m triage.report`
-- [ ] C4 (ADR 0014): build, dev run of B, C3 and C4, fix errors, freeze
+- [x] C4 (ADR 0014), the last guarded config: built and tested on dev fixtures, no model run yet
+- [ ] C4 dev run of B, C3 and C4 (at most two), fix errors, freeze
 - [ ] One post-hoc held-out run of A, B, C, C2, C3 and C4, then file the results
