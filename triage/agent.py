@@ -138,7 +138,7 @@ class Model(Protocol):
 # A harness failure (exception, timeout, dropped server) is not the model's answer:
 # resume retries it and the report counts it as a harness error. Running out of
 # tool calls is the model's own behaviour and stays as a result.
-MODEL_OUTCOME_ERRORS = {"budget_exhausted_without_answer"}
+MODEL_OUTCOME_ERRORS = {"budget_exhausted_without_answer", "token_cap_without_answer"}
 
 
 def is_harness_error(error) -> bool:
@@ -360,7 +360,7 @@ def _guard_code_sha256(config: str = "C2") -> str:
     if config == "C4":
         # C4's guards live in triage/c4.py and in the run loop, so both are covered.
         parts.append(Path(c4.__file__).read_text(encoding="utf-8"))
-        parts += [inspect.getsource(f) for f in (run_case, _settle_c4)]
+        parts += [inspect.getsource(f) for f in (run_case, _settle_c4, _repeats_a_call, _file_held_or_fail)]
     return hashlib.sha256("\n".join(parts).replace("\r\n", "\n").encode()).hexdigest()
 
 
@@ -383,12 +383,17 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
     held = None  # C3, C4: the last answer sent back, kept in case the budget runs out (ADR 0013)
     if config in C2_FAMILY:
         log["c2_pushbacks"], log["c2_violation"] = 0, False
+    if config == "C4":
+        log["c4_duplicates"], log["c4_token_cap_hit"] = [], False
     t0 = time.monotonic()
     try:
         # One turn per tool call plus the answer; C2 gets one more turn per allowed push-back,
         # so push-backs never cost a tool call (ADR 0012). A, B and C are unchanged.
         extra_turns = MAX_PUSHBACKS if config in C2_FAMILY else 0
         for _ in range(CALL_BUDGET + 1 + extra_turns):
+            if config == "C4" and log["input_tokens"] + log["output_tokens"] >= c4.TOKEN_CAP:
+                log["c4_token_cap_hit"] = True  # guard 4: stop a runaway run (ADR 0014)
+                break
             act, usage = model.step(PROMPTS[config], messages, tools)
             log["input_tokens"] += usage.input_tokens
             log["output_tokens"] += usage.output_tokens
@@ -400,6 +405,14 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
                 log["output_raw"] = act.text
                 break
             # The model asked for a tool.
+            if config == "C4" and _repeats_a_call(act, log["tool_calls"]):
+                # Guard 4: an identical call is not run again. It is kept out of tool_calls, so it
+                # costs no tool call and is not scored, but it does use one of the run's turns.
+                log["c4_duplicates"].append({"name": act.name, "args": act.args})
+                messages.append({"role": "assistant", "tool_call": {"name": act.name, "args": act.args}})
+                messages.append({"role": "tool", "name": act.name, "content": json.dumps(
+                    {"error": "duplicate call: its results are already above"})})
+                continue
             entry = {"name": act.name, "args": act.args, "allowed": act.name in ALLOWED_TOOLS,
                      "valid": None, "executed": False, "returned_ids": []}
             over_budget = len(log["tool_calls"]) >= CALL_BUDGET or config == "A"
@@ -426,10 +439,9 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
             messages.append({"role": "assistant", "tool_call": {"name": act.name, "args": act.args}})
             messages.append({"role": "tool", "name": act.name, "content": result})
         else:
-            if held is not None:  # C3, C4: an analyst out of time still files their best answer
-                log["output_raw"], log["c2_violation"] = held, True
-            else:
-                log["error"] = "budget_exhausted_without_answer"
+            _file_held_or_fail(log, held, "budget_exhausted_without_answer")
+        if log.get("c4_token_cap_hit"):
+            _file_held_or_fail(log, held, "token_cap_without_answer")
     except Exception as exc:  # keep the run in the log instead of crashing the batch
         log["error"] = f"{type(exc).__name__}: {exc}"
     log["latency_s"] = round(time.monotonic() - t0, 3)
@@ -442,6 +454,19 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
     if config in GUARDED and log["output"]:
         log["gate"] = [gate.request_approval(a) for a in log["output"].get("proposed_actions", [])]
     return log
+
+
+def _file_held_or_fail(log: dict, held: str | None, error: str) -> None:
+    """The run stopped without an answer: file the held answer if there is one, else record why."""
+    if held is not None:  # C3, C4: an analyst out of time still files their best answer
+        log["output_raw"], log["c2_violation"] = held, True
+    else:
+        log["error"] = error
+
+
+def _repeats_a_call(act: ToolCall, tool_calls: list[dict]) -> bool:
+    """C4 guard 4 (ADR 0014): True when this exact tool call (name and arguments) already ran."""
+    return any(c["executed"] and c["name"] == act.name and c["args"] == act.args for c in tool_calls)
 
 
 C2_MUST_CALL = ("event_search", "entity_lookup")

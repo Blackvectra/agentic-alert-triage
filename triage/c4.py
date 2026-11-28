@@ -8,6 +8,11 @@ import re
 
 from . import c2
 
+# Guard 4, cost cap (ADR 0014): a run stops before any model turn once it has used this many
+# tokens. C3's dev run used at most 22,423, so the cap only stops a runaway. The loop cap (a
+# repeated identical tool call is not run again) lives in the run loop, triage/agent.py.
+TOKEN_CAP = 32_000
+
 # Guard 1, missing-evidence abstain (ADR 0014). A lookup on an alert entity that ran and found
 # nothing means the alert cannot be confirmed from the logs: some of its evidence is missing.
 # Built-in accounts such as NT AUTHORITY\SYSTEM have no directory record, and IP addresses often

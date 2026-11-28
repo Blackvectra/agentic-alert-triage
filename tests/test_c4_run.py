@@ -77,3 +77,45 @@ def test_only_actions_the_policy_allows_reach_the_gate():
     assert [g["action"] for g in log["gate"]] == [backed] and log["output"]["proposed_actions"] == [backed]
     assert log["c4_actions_blocked"] == [{"action": bare, "reason": "it cites no evidence"}]
     assert all(g["executed"] is False for g in log["gate"])
+
+
+# Guard 4, loop and cost caps.
+def test_a_repeated_call_is_not_run_again_and_costs_no_tool_call():
+    log = _run(FULL[:1] + FULL + [_final(evidence_ids=["E-EVT-001"])])
+    assert log["c4_duplicates"] == [{"name": "entity_lookup", "args": {"id": USER}}]
+    assert len(log["tool_calls"]) == len(FULL)  # the repeat is not scored as a call
+    assert log["c2_check"]["outcome"] == "accepted"
+
+
+def test_repeats_still_use_up_the_runs_turns():
+    log = _run(FULL[:1] * 30)
+    turns = agent.CALL_BUDGET + 1 + agent.MAX_PUSHBACKS  # the same number of turns as C3
+    assert len(log["tool_calls"]) == 1 and len(log["c4_duplicates"]) == turns - 1
+    assert log["error"] == "budget_exhausted_without_answer"
+
+
+class Costly(ScriptedModel):
+    """Every turn uses 20,000 tokens, so the second turn crosses C4's cap."""
+
+    def step(self, system, messages, tools):
+        act, _ = super().step(system, messages, tools)
+        return act, agent.Usage(20_000, 0)
+
+
+def test_the_token_cap_files_the_held_answer():
+    script = [_final(evidence_ids=["E-EVT-001"])] + FULL  # pushed back, then the cap stops the run
+    log = run_case(CASE, "complete", "C4", Costly(script), build_view(CASE, "complete"))
+    assert log["c4_token_cap_hit"] is True and log["error"] is None
+    assert log["c2_violation"] is True and log["output"] is not None
+
+
+def test_the_token_cap_without_an_answer_is_the_models_outcome_not_a_harness_error():
+    log = run_case(CASE, "complete", "C4", Costly(FULL), build_view(CASE, "complete"))
+    assert log["error"] == "token_cap_without_answer" and len(log["tool_calls"]) == 2
+    assert agent.is_harness_error(log["error"]) is False
+
+
+def test_other_configs_have_no_caps():
+    log = run_case(CASE, "complete", "C3", Costly(FULL + [_final(evidence_ids=["E-EVT-001"])]),
+                   build_view(CASE, "complete"))
+    assert "c4_token_cap_hit" not in log and log["output"] is not None
