@@ -50,16 +50,18 @@ def known_bad_indicators(records: list[dict]) -> list[tuple[str, str]]:
 
 
 # Layer 1 (ADR 0012): instruction-like text in tool output. Written from common prompt-injection
-# wording (docs/research/real-world-guardrails.md), never from held-out cases. Flagged text is kept,
+# wording (docs/research/real-world-guardrails.md), never from any case's planted text: words
+# fitted to a dev case's injection were removed on 2026-11-28 (code review). Flagged text is kept,
 # never deleted: a planted instruction is itself evidence of an attack.
 INJECTION_PATTERNS = [
     # Overriding the reader's instructions.
-    r"\bignore (all |any )?(the )?(previous|prior|above|earlier|vendor)\b",
+    r"\bignore (all |any )?(the |your )?(previous|prior|above|earlier)\b",
+    r"\bignore (all |any )?(the |your |these |this )?(instructions?|rules|guidance|warnings?|alerts?)\b",
     r"\b(disregard|override) (all |any )?(the |your )?(previous|prior|above|instructions|rules)\b",
     r"\byou are now\b",
     # Text addressed to an automated reader rather than to a person.
     r"\b(note|message|instructions?) (to|for) (the |any )?(ai|assistant|llm|automated|triage)\b",
-    r"\b(ai|llm|assistant|automated triage|triage (assistant|tools?|automation))\s*:",
+    r"\b(ai|llm|assistant|automated (reader|system|analysis|review|triage))\s*:",
     r"\bsystem (note|prompt|message)\b",
     r"\bbefore answering\b",
     # Telling the reader what verdict to give.
