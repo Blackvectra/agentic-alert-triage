@@ -536,6 +536,13 @@ def test_c3_success_applies_the_three_rules_fixed_in_adr_0013(kwargs, above_c2, 
     assert r["mcnemar_c2_vs_c3"]["pairs"] == 20
 
 
+def test_a_higher_rate_mcnemar_cannot_tell_from_chance_is_not_above_c2():
+    r = report.c3_success(_c3_rows(c3_right=4, c2_right=3))  # 2 pairs disagree, both for C3: p = 0.5
+    assert r["c3_useful_answer_rate"] > r["c2_useful_answer_rate"]
+    assert r["mcnemar_c2_vs_c3"]["p_value"] == 0.5
+    assert (r["above_c2"], r["overall"]) == ("fail", "fail")
+
+
 def test_c3_success_is_none_without_b_c2_and_c3():
     assert report.c3_success([r for r in _c3_rows() if r["config"] != "C2"]) is None
 
