@@ -55,3 +55,22 @@ def test_clone_replaces_old_code_keeps_results_and_reports_commit(tmp_path):
     assert (project / "code.py").read_text() == "new"
     assert (project / "runs" / "logs.jsonl").read_text() == "results"   # earlier runs survive
     assert not (project / ".git").exists()
+
+
+def test_saving_a_run_to_drive_never_overwrites_an_earlier_save(tmp_path):
+    # Two dev runs of the same configs share a folder name, and a new Colab session starts
+    # with an empty disk: copying over the old Drive folder would replace dev run 1's logs.
+    from triage.colab import save_run_copy
+
+    drive = tmp_path / "drive" / "ee672_runs"
+    run = tmp_path / "runs" / "dev_ollama-qwen3-32b_BC3C4"
+    run.mkdir(parents=True)
+    (run / "logs.jsonl").write_text("dev run 1")
+    first = save_run_copy(run, drive)
+    (run / "logs.jsonl").write_text("dev run 2")
+    second = save_run_copy(run, drive)
+
+    assert first == drive / "dev_ollama-qwen3-32b_BC3C4"
+    assert second == drive / "dev_ollama-qwen3-32b_BC3C4_2"
+    assert (first / "logs.jsonl").read_text() == "dev run 1"
+    assert (second / "logs.jsonl").read_text() == "dev run 2"

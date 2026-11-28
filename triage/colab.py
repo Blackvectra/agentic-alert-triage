@@ -37,3 +37,21 @@ def copy_clone_over_project(clone_dir, project_dir) -> str:
     shutil.copytree(clone_dir, project_dir, dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns(".git"))
     return commit
+
+
+def save_run_copy(run_dir, drive_dir) -> Path:
+    """Copy a run folder into drive_dir and return where it went. Never overwrites.
+
+    Two runs with the same settings (two dev runs of the same configs, say) get the same folder
+    name, and a new Colab session starts with an empty disk, so copying over the old folder
+    would replace the earlier run's logs. A name already taken gets _2, _3, ... instead.
+    """
+    import shutil
+
+    run_dir, drive_dir = Path(run_dir), Path(drive_dir)
+    dest, n = drive_dir / run_dir.name, 1
+    while dest.exists():
+        n += 1
+        dest = drive_dir / f"{run_dir.name}_{n}"
+    shutil.copytree(run_dir, dest)
+    return dest
