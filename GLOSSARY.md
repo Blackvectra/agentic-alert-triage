@@ -124,6 +124,12 @@ An exploratory guarded config designed after the held-out results (ADR 0012). It
 **C3**:
 An exploratory config: C2 with its "investigate first" layer replaced by the coverage rule (ADR 0013). Reported separately as post-hoc.
 
+**C4**:
+The last exploratory guarded config (ADR 0014): C3 plus four guards enforced in code. It must abstain when a lookup on an alert entity found nothing, it quarantines suspected injections, it drops proposed actions that lack a true-positive verdict or retrieved evidence, and it caps repeated calls and tokens. Reported separately as post-hoc.
+
+**Quarantine**:
+Replacing a field of tool output that reads like an instruction with a placeholder before the model sees it. The record stays, and the answer checks still see the original text.
+
 **Coverage rule**:
 Before answering, look up every entity named in the alert and run one unfiltered event search on every user and IP in it. Built from the alert alone, never from the case's answers.
 

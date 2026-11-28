@@ -50,16 +50,18 @@ def known_bad_indicators(records: list[dict]) -> list[tuple[str, str]]:
 
 
 # Layer 1 (ADR 0012): instruction-like text in tool output. Written from common prompt-injection
-# wording (docs/research/real-world-guardrails.md), never from held-out cases. Flagged text is kept,
+# wording (docs/research/real-world-guardrails.md), never from any case's planted text: words
+# fitted to a dev case's injection were removed on 2026-11-28 (code review). Flagged text is kept,
 # never deleted: a planted instruction is itself evidence of an attack.
 INJECTION_PATTERNS = [
     # Overriding the reader's instructions.
-    r"\bignore (all |any )?(the )?(previous|prior|above|earlier|vendor)\b",
+    r"\bignore (all |any )?(the |your )?(previous|prior|above|earlier)\b",
+    r"\bignore (all |any )?(the |your |these |this )?(instructions?|rules|guidance|warnings?|alerts?)\b",
     r"\b(disregard|override) (all |any )?(the |your )?(previous|prior|above|instructions|rules)\b",
     r"\byou are now\b",
     # Text addressed to an automated reader rather than to a person.
     r"\b(note|message|instructions?) (to|for) (the |any )?(ai|assistant|llm|automated|triage)\b",
-    r"\b(ai|llm|assistant|automated triage|triage (assistant|tools?|automation))\s*:",
+    r"\b(ai|llm|assistant|automated (reader|system|analysis|review|triage))\s*:",
     r"\bsystem (note|prompt|message)\b",
     r"\bbefore answering\b",
     # Telling the reader what verdict to give.
@@ -157,6 +159,15 @@ def _alert_values(alert: dict) -> list[tuple[str, str]]:
     return pairs
 
 
+def _is_source_field(field: str) -> bool:
+    """src_ip, src_ip_1, src_ip_2 or plain ip: an address event_search can look for.
+
+    A destination or egress address is not a source address; searching for it with src_ip would
+    return nothing, so the rule never asks for that search (code review, 2026-11-28).
+    """
+    return field == "ip" or field.startswith("src_ip")
+
+
 def missing_coverage(alert: dict, tool_calls: list[dict]) -> list[str]:
     """Name every lookup the coverage rule still needs. Empty means the rule is met.
 
@@ -174,8 +185,8 @@ def missing_coverage(alert: dict, tool_calls: list[dict]) -> list[str]:
     for field, v in pairs:
         if field == "user" or "@" in v:
             key = "user"
-        elif _IPV4.fullmatch(v):
-            key = "src_ip"
+        elif _IPV4.fullmatch(v) and _is_source_field(field):
+            key = "src_ip"  # event_search filters by source IP only, so only a source IP can be searched
         else:
             continue
         if (key, v.lower()) not in searched:

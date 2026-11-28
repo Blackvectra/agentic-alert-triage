@@ -7,6 +7,12 @@ frozen as of this run; nothing is tuned on it. The main conclusion stays with `h
 Run: 2026-11-25, qwen3:32b, A, B, C, C2 and C3 in one session (450 runs = 30 held-out cases
 x 3 variants x 5 configs), 0 harness errors, every prompt fingerprint matches `FROZEN.json`
 (C2 and C3 both `bcb8d372fc`).
+
+**Superseded code (2026-11-28).** A code review changed C2 and C3 after this run: generic layer-1
+patterns, an IP search asked for on source IPs only, and fingerprints that cover their code
+(ADRs 0012 and 0013). This file stays as the result of the old code. The above-C2 rule now
+requires McNemar p < 0.05, which leaves this run's verdict (fail) unchanged. The re-run is filed
+separately.
   logs.jsonl    sha256 569aa51193e00c9b67fb63c5b5fe3a6cc72816cff771ec6b98739f48c2bbbee9
   scores.jsonl  sha256 31e826c7cb8d92c6fa63e02ddca10a814535f35cbcfa287093ff946a3c2c01df
 

@@ -162,6 +162,16 @@ def test_projection_uses_the_planned_30_cases_when_none_are_written_yet(tmp_path
     assert "projected for 270 runs (planned 30 held-out cases; none written yet)" in out
 
 
+def test_projection_counts_every_config_the_run_was_asked_for(tmp_path, capsys, monkeypatch):
+    # The post-hoc held-out run is A, B, C, C2, C3 and C4: 30 x 3 variants x 6 configs = 540 runs.
+    _dev_only(monkeypatch)
+    run.main(["--dry-run", "--configs", "A,B,C,C2,C3,C4", "--out", str(tmp_path / "six")])
+    out = capsys.readouterr().out
+    assert "projected for 540 runs" in out
+    table = [line.split()[0] for line in out.splitlines() if line[:2] in ("A ", "B ", "C ", "C2", "C3", "C4")]
+    assert table == ["A", "B", "C", "C2", "C3", "C4"]
+
+
 def test_projection_counts_the_held_out_cases_that_exist(tmp_path, capsys, monkeypatch):
     import copy
     real = [c for c in run.load_cases() if c["split"] == "dev"]
