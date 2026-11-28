@@ -24,7 +24,7 @@ def test_c2_and_c3_fingerprints_differ_and_cover_their_code(monkeypatch):
     from triage import agent
     before = {c: agent.prompt_fingerprint(c) for c in ("B", "C", "C2", "C3")}
     assert before["C2"] != before["C3"]  # same prompt and tools, different code
-    monkeypatch.setattr(agent, "C2_MAX_PUSHBACKS", 3)  # a code-only change
+    monkeypatch.setattr(agent, "MAX_PUSHBACKS", 3)  # a code-only change
     after = {c: agent.prompt_fingerprint(c) for c in ("B", "C", "C2", "C3")}
     assert after["C2"] != before["C2"] and after["C3"] != before["C3"]
     assert (after["B"], after["C"]) == (before["B"], before["C"])  # main configs untouched

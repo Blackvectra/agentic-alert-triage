@@ -348,8 +348,8 @@ def prompt_fingerprint(config: str) -> str:
 def _guard_code_sha256() -> str:
     """SHA-256 of the code C2 and C3 add on top of C: triage/c2.py and their loop helpers."""
     parts = [Path(c2.__file__).read_text(encoding="utf-8")]
-    parts += [inspect.getsource(f) for f in (_c2_push_back, _c3_push_back, _settle_c2)]
-    parts.append(repr((C2_MUST_CALL, C2_MAX_PUSHBACKS, INVESTIGATE_FIRST)))
+    parts += [inspect.getsource(f) for f in (_push_back, _c2_still_to_do, _c3_still_to_do, _settle_c2)]
+    parts.append(repr((C2_MUST_CALL, MAX_PUSHBACKS, INVESTIGATE_FIRST)))
     return hashlib.sha256("\n".join(parts).replace("\r\n", "\n").encode()).hexdigest()
 
 
@@ -376,16 +376,15 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
     try:
         # One turn per tool call plus the answer; C2 gets one more turn per allowed push-back,
         # so push-backs never cost a tool call (ADR 0012). A, B and C are unchanged.
-        extra_turns = C2_MAX_PUSHBACKS if config in C2_FAMILY else 0
+        extra_turns = MAX_PUSHBACKS if config in C2_FAMILY else 0
         for _ in range(CALL_BUDGET + 1 + extra_turns):
             act, usage = model.step(PROMPTS[config], messages, tools)
             log["input_tokens"] += usage.input_tokens
             log["output_tokens"] += usage.output_tokens
             if isinstance(act, Final):
-                if config == "C2" and _c2_push_back(log, messages, act.text):
-                    continue
-                if config == "C3" and _c3_push_back(log, messages, act.text, view["alert"]):
-                    held = act.text
+                if config in LAYER_2 and _push_back(log, messages, act.text, config, view["alert"]):
+                    if config == "C3":
+                        held = act.text  # ADR 0013: kept in case the budget runs out
                     continue
                 log["output_raw"] = act.text
                 break
@@ -431,44 +430,44 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
 
 
 C2_MUST_CALL = ("event_search", "entity_lookup")
-C2_MAX_PUSHBACKS = 2
+MAX_PUSHBACKS = 2  # C2 and C3: how many answers layer 2 may send back before accepting one
 INVESTIGATE_FIRST = ("Not accepted yet: investigate first. Call event_search and entity_lookup"
                      " before giving your final answer.")
 
 
-def _c2_push_back(log: dict, messages: list, answer: str) -> bool:
-    """C2 layer 2 (ADR 0012): send an answer back if both required tools have not run yet.
-
-    Returns True when the answer was sent back. After C2_MAX_PUSHBACKS the answer is
-    accepted and the run is marked as a policy violation.
-    """
+def _c2_still_to_do(log: dict, alert: dict) -> str | None:
+    """C2 layer 2 (ADR 0012): both required tools must have run. None when they have."""
     ran = {c["name"] for c in log["tool_calls"] if c["executed"]}
-    if all(name in ran for name in C2_MUST_CALL):
-        return False
-    if log["c2_pushbacks"] >= C2_MAX_PUSHBACKS:
-        log["c2_violation"] = True
-        return False
-    log["c2_pushbacks"] += 1
-    messages.append({"role": "assistant", "content": answer})
-    messages.append({"role": "user", "content": INVESTIGATE_FIRST})
-    return True
+    return None if all(name in ran for name in C2_MUST_CALL) else INVESTIGATE_FIRST
 
 
-def _c3_push_back(log: dict, messages: list, answer: str, alert: dict) -> bool:
-    """C3 layer 2 (ADR 0013): send an answer back with a checklist of the lookups still missing.
-
-    Same limits as C2: at most C2_MAX_PUSHBACKS, then the answer is accepted as a violation.
-    """
+def _c3_still_to_do(log: dict, alert: dict) -> str | None:
+    """C3 layer 2 (ADR 0013): a checklist of the coverage lookups still missing. None when met."""
     missing = c2.missing_coverage(alert, log["tool_calls"])
     if not missing:
+        return None
+    return "Not accepted yet: look up every alert entity first. Still missing: " + "; ".join(missing) + "."
+
+
+# What layer 2 checks, per config. Only the check differs; the limits are shared.
+LAYER_2 = {"C2": _c2_still_to_do, "C3": _c3_still_to_do}
+
+
+def _push_back(log: dict, messages: list, answer: str, config: str, alert: dict) -> bool:
+    """Layer 2: send an answer back with what is still to do, at most MAX_PUSHBACKS times.
+
+    Returns True when the answer was sent back. Once the limit is reached the answer is
+    accepted and the run is marked as a policy violation. Push-backs never cost a tool call.
+    """
+    still_to_do = LAYER_2[config](log, alert)
+    if still_to_do is None:
         return False
-    if log["c2_pushbacks"] >= C2_MAX_PUSHBACKS:
+    if log["c2_pushbacks"] >= MAX_PUSHBACKS:
         log["c2_violation"] = True
         return False
     log["c2_pushbacks"] += 1
     messages.append({"role": "assistant", "content": answer})
-    messages.append({"role": "user", "content": "Not accepted yet: look up every alert entity first."
-                     " Still missing: " + "; ".join(missing) + "."})
+    messages.append({"role": "user", "content": still_to_do})
     return True
 
 
