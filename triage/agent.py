@@ -11,10 +11,12 @@ Every run returns a log dict. The scorer works from logs alone.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import re
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Protocol
 
 import jsonschema
@@ -335,8 +337,20 @@ def prompt_fingerprint(config: str) -> str:
     Logged with every run, and resume reruns any run whose fingerprint differs,
     so results from older prompts or tools are never mixed with current ones.
     """
-    return hashlib.sha256(json.dumps({"system": PROMPTS[config], "tools": tools_for(config)},
-                                     sort_keys=True).encode()).hexdigest()
+    told = {"system": PROMPTS[config], "tools": tools_for(config)}
+    if config in C2_FAMILY:
+        # C2 and C3 share a prompt and tools; what makes them different is code. So their
+        # fingerprint also covers that code and their name (code review, 2026-11-28).
+        told |= {"config": config, "code": _guard_code_sha256()}
+    return hashlib.sha256(json.dumps(told, sort_keys=True).encode()).hexdigest()
+
+
+def _guard_code_sha256() -> str:
+    """SHA-256 of the code C2 and C3 add on top of C: triage/c2.py and their loop helpers."""
+    parts = [Path(c2.__file__).read_text(encoding="utf-8")]
+    parts += [inspect.getsource(f) for f in (_c2_push_back, _c3_push_back, _settle_c2)]
+    parts.append(repr((C2_MUST_CALL, C2_MAX_PUSHBACKS, INVESTIGATE_FIRST)))
+    return hashlib.sha256("\n".join(parts).replace("\r\n", "\n").encode()).hexdigest()
 
 
 def run_case(case: dict, variant: str, config: str, model: Model, view: dict) -> dict:

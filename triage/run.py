@@ -27,6 +27,7 @@ from .agent import (
     prompt_fingerprint,
     run_case,
 )
+from .build import code_commit
 from .fixtures import ROOT, VARIANTS, build_view, load_cases
 from .jsonl import read_jsonl
 from .score import score_run
@@ -182,6 +183,7 @@ def main(argv=None) -> None:
         cases = load_cases(args.split or "dev", args.family)
 
     done = _prepare_resume(out_dir)
+    commit = code_commit()
     new_logs = []
     planned = [(case["case_id"], variant, config) for case in cases for variant in VARIANTS for config in configs]
     total = len(planned)
@@ -196,6 +198,7 @@ def main(argv=None) -> None:
                     if (case["case_id"], variant, config) in done:
                         continue
                     log = run_case(case, variant, config, make_model(), view)  # fresh model per run
+                    log["code_commit"] = commit  # which code made this run (retro, 2026-11-28)
                     logs.write(json.dumps(log) + "\n")
                     scores.write(json.dumps(score_run(log, case)) + "\n")
                     logs.flush(), scores.flush()  # survive a disconnect mid-batch
@@ -205,7 +208,7 @@ def main(argv=None) -> None:
                           f"{log['latency_s']:6.1f}s  error={log['error']}"
                           f"{_time_left(new_logs, total - finished)}", flush=True)
 
-    print(f"{len(new_logs)} new runs, {total - len(new_logs)} already done -> {out_dir}")
+    print(f"{len(new_logs)} new runs, {total - len(new_logs)} already done -> {out_dir} (code {commit[:12]})")
     failed = sum(is_harness_error(l["error"]) for l in new_logs)
     if failed:
         print(f"WARNING: {failed} harness errors; rerun the same --out to retry")
