@@ -17,6 +17,11 @@ these failures, and measures them.
 **Post-hoc.** Like C2 and C3, C4 is designed after the held-out results were seen. Its held-out
 result is exploratory and never replaces the A/B/C result.
 
+**The last guarded config.** The user decided (2026-11-28) that C4 is the final guarded
+config: no C5 follows. Whatever C4's held-out result, it is reported as it is, and the guards are
+not tuned again on what the held-out run shows. C stays the pre-registered guarded config of
+the main A/B/C result; C4 is the project's most complete set of guardrails, reported next to it.
+
 **Not changed.** A, B, C, C2, C3, their prompts and `FROZEN.json` entries, `triage/score.py`
 and every case's expected answers. C4 is scored by the same rules.
 

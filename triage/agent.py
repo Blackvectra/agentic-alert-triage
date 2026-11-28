@@ -21,7 +21,7 @@ from typing import Protocol
 
 import jsonschema
 
-from . import c2, gate
+from . import c2, c4, gate
 from .tools import ALLOWED_TOOLS, IMPLEMENTATIONS, TOOL_SPECS
 
 CALL_BUDGET = 8  # identical for B and C so the comparison is fair
@@ -102,9 +102,12 @@ PROMPTS["C2"] = (
 MAIN_CONFIGS = ("A", "B", "C")    # the frozen experiment
 # C3 (ADR 0013): C2 with layer 2 replaced by the coverage rule; same prompt and tools.
 PROMPTS["C3"] = PROMPTS["C2"]
-EXPLORATORY_CONFIGS = ("C2", "C3")     # post-hoc, run only on request
-C2_FAMILY = ("C2", "C3")  # configs that use C2's layers 1 and 3
-GUARDED = ("C", "C2", "C3")  # configs that reject invalid tool calls and send actions to the gate
+# C4 (ADR 0014): C3 plus four guards in code; same prompt and tools. The last guarded config.
+PROMPTS["C4"] = PROMPTS["C3"]
+EXPLORATORY_CONFIGS = ("C2", "C3", "C4")     # post-hoc, run only on request
+C2_FAMILY = ("C2", "C3", "C4")  # configs that use C2's layers 1 and 3
+GUARDED = ("C", "C2", "C3", "C4")  # configs that reject invalid tool calls and send actions to the gate
+KEEPS_HELD_ANSWER = ("C3", "C4")  # configs that file their last sent-back answer when the budget runs out
 
 
 @dataclass
@@ -327,7 +330,7 @@ def _alert_message(view: dict) -> str:
 
 
 def tools_for(config: str) -> list | None:
-    """Tool definitions a config sends: none for A, identical for B, C, C2 and C3 (ADR 0001)."""
+    """Tool definitions a config sends: none for A, identical for B, C, C2, C3 and C4 (ADR 0001)."""
     return None if config == "A" else [{"name": n, **TOOL_SPECS[n]} for n in sorted(ALLOWED_TOOLS)]
 
 
@@ -341,15 +344,22 @@ def prompt_fingerprint(config: str) -> str:
     if config in C2_FAMILY:
         # C2 and C3 share a prompt and tools; what makes them different is code. So their
         # fingerprint also covers that code and their name (code review, 2026-11-28).
-        told |= {"config": config, "code": _guard_code_sha256()}
+        told |= {"config": config, "code": _guard_code_sha256(config)}
     return hashlib.sha256(json.dumps(told, sort_keys=True).encode()).hexdigest()
 
 
-def _guard_code_sha256() -> str:
-    """SHA-256 of the code C2 and C3 add on top of C: triage/c2.py and their loop helpers."""
+def _guard_code_sha256(config: str = "C2") -> str:
+    """SHA-256 of the code a guarded config adds on top of C.
+
+    C2 and C3: triage/c2.py and their loop helpers. C4 adds its own code (ADR 0014) to that,
+    so changing C4 never changes the C2 or C3 fingerprint.
+    """
     parts = [Path(c2.__file__).read_text(encoding="utf-8")]
     parts += [inspect.getsource(f) for f in (_push_back, _c2_still_to_do, _c3_still_to_do, _settle_c2)]
     parts.append(repr((C2_MUST_CALL, MAX_PUSHBACKS, INVESTIGATE_FIRST)))
+    if config == "C4":
+        # C4's guards live in triage/c4.py and in the run loop, so both are covered.
+        parts += [Path(c4.__file__).read_text(encoding="utf-8"), inspect.getsource(run_case)]
     return hashlib.sha256("\n".join(parts).replace("\r\n", "\n").encode()).hexdigest()
 
 
@@ -369,7 +379,7 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
         "refusals_measured": getattr(model, "reports_refusals", False),
     }
     retrieved = []  # every record a tool returned in this run; C2's answer checks read it
-    held = None  # C3: the last answer sent back, kept in case the budget runs out (ADR 0013)
+    held = None  # C3, C4: the last answer sent back, kept in case the budget runs out (ADR 0013)
     if config in C2_FAMILY:
         log["c2_pushbacks"], log["c2_violation"] = 0, False
     t0 = time.monotonic()
@@ -383,7 +393,7 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
             log["output_tokens"] += usage.output_tokens
             if isinstance(act, Final):
                 if config in LAYER_2 and _push_back(log, messages, act.text, config, view["alert"]):
-                    if config == "C3":
+                    if config in KEEPS_HELD_ANSWER:
                         held = act.text  # ADR 0013: kept in case the budget runs out
                     continue
                 log["output_raw"] = act.text
@@ -413,7 +423,7 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
             messages.append({"role": "assistant", "tool_call": {"name": act.name, "args": act.args}})
             messages.append({"role": "tool", "name": act.name, "content": result})
         else:
-            if held is not None:  # C3: an analyst out of time still files their best answer
+            if held is not None:  # C3, C4: an analyst out of time still files their best answer
                 log["output_raw"], log["c2_violation"] = held, True
             else:
                 log["error"] = "budget_exhausted_without_answer"
@@ -450,7 +460,7 @@ def _c3_still_to_do(log: dict, alert: dict) -> str | None:
 
 
 # What layer 2 checks, per config. Only the check differs; the limits are shared.
-LAYER_2 = {"C2": _c2_still_to_do, "C3": _c3_still_to_do}
+LAYER_2 = {"C2": _c2_still_to_do, "C3": _c3_still_to_do, "C4": _c3_still_to_do}
 
 
 def _push_back(log: dict, messages: list, answer: str, config: str, alert: dict) -> bool:
@@ -521,7 +531,7 @@ def _parse_output(log: dict, config: str) -> None:
         log["output"], log["output_valid"] = out, True
     except (json.JSONDecodeError, jsonschema.ValidationError):
         log["output_valid"] = False
-        # B keeps whatever it can parse; the guarded configs (C, C2, C3) treat it as an abstention.
+        # B keeps whatever it can parse; the guarded configs (C, C2, C3, C4) treat it as an abstention.
         try:
             log["output"] = json.loads(text) if config not in GUARDED else None
         except json.JSONDecodeError:

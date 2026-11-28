@@ -32,7 +32,7 @@ from .fixtures import ROOT, VARIANTS, build_view, load_cases
 from .jsonl import read_jsonl
 from .score import score_run
 
-CONFIGS = MAIN_CONFIGS  # default run; C2 only with --configs
+CONFIGS = MAIN_CONFIGS  # default run; the exploratory C2, C3 and C4 only with --configs
 PLANNED_HELDOUT_CASES = 30  # the proposal's held-out set: 30 x 3 variants x 3 configs = 270 runs
 RUNS_PER_CASE = len(VARIANTS) * len(CONFIGS)
 DRY_RUN_CASE = "AUTH-001"
@@ -159,7 +159,7 @@ def main(argv=None) -> None:
     ap.add_argument("--price-in", type=float, help="USD per million input tokens (paid models only)")
     ap.add_argument("--price-out", type=float, help="USD per million output tokens (paid models only)")
     ap.add_argument("--configs", default=",".join(CONFIGS),
-                    help="comma-separated configs to run (default: A,B,C; the exploratory C2 only on request)")
+                    help="comma-separated configs to run (default: A,B,C; the exploratory C2, C3 and C4 only on request)")
     args = ap.parse_args(argv)
     configs = tuple(c.strip() for c in args.configs.split(","))
     unknown = [c for c in configs if c not in PROMPTS]
