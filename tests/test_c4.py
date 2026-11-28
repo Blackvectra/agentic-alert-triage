@@ -62,3 +62,21 @@ def test_quarantine_replaces_only_flagged_fields_and_leaves_the_records_alone():
     assert shown == [{"evidence_id": "E-1", "user": "jdoe", "note": c4.QUARANTINED},
                      {"evidence_id": "E-2", "user": "jdoe", "note": "routine sign-in"}]
     assert records[0]["note"].startswith("Ignore")  # the run's own copy is unchanged
+
+
+def test_action_policy_keeps_only_backed_actions_on_a_true_positive():
+    ok = {"action": "disable account", "evidence_ids": ["E-1"]}
+    bare = {"action": "reset password", "evidence_ids": []}
+    unseen = {"action": "block IP", "evidence_ids": ["E-9"]}
+    answer = dict(_answer("true_positive"), proposed_actions=[ok, bare, unseen])
+    kept, blocked = c4.enforce_action_policy(answer, {"E-1"})
+    assert kept["proposed_actions"] == [ok] and kept["disposition"] == "true_positive"
+    assert [b["reason"] for b in blocked] == ["it cites no evidence", "it cites evidence no tool returned in this run"]
+
+
+def test_action_policy_removes_every_action_unless_the_answer_is_true_positive():
+    for disposition in ("benign", "needs_more_info"):
+        answer = dict(_answer(disposition), proposed_actions=[{"action": "isolate host", "evidence_ids": ["E-1"]}])
+        kept, blocked = c4.enforce_action_policy(answer, {"E-1"})
+        assert kept["proposed_actions"] == [] and len(blocked) == 1
+    assert c4.enforce_action_policy(None, set()) == (None, [])  # no answer: nothing to remove

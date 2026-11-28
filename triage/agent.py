@@ -529,8 +529,10 @@ def _settle_c4(log: dict, model, messages: list, retrieved: list, alert: dict) -
     log["c2_injection_flags"] = [{"evidence_id": eid, "field": field}
                                  for eid, field in dict.fromkeys(c2.suspected_injections(retrieved))]
     log["c4_empty_lookups"] = c4.empty_lookups(alert, log["tool_calls"])  # guard 1
+    retrieved_ids = {r["evidence_id"] for r in retrieved}
     log["output"], log["c2_check"] = c4.settle_answer(
-        log["output"], ask_again, {r["evidence_id"] for r in retrieved}, retrieved, log["c4_empty_lookups"])
+        log["output"], ask_again, retrieved_ids, retrieved, log["c4_empty_lookups"])
+    log["output"], log["c4_actions_blocked"] = c4.enforce_action_policy(log["output"], retrieved_ids)  # guard 3
 
 
 def _strip_code_fence(raw: str) -> str:

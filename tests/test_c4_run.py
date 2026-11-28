@@ -67,3 +67,13 @@ def test_the_model_never_sees_a_flagged_field_but_layer_3_still_does():
     assert payload not in tool_text and "withheld by C4" in tool_text
     assert {"evidence_id": "E-EVT-004", "field": "rule_name"} in log["c2_injection_flags"]
     assert log["c2_check"]["outcome"] == "fallback"  # benign is still refused: the flag is a known-bad sign
+
+
+# Guard 3, action policy: only allowed actions reach the approval gate.
+def test_only_actions_the_policy_allows_reach_the_gate():
+    backed = {"action": "disable account", "evidence_ids": ["E-EVT-001"]}
+    bare = {"action": "reset password", "evidence_ids": []}
+    log = _run(FULL + [_final(evidence_ids=["E-EVT-001"], actions=[backed, bare])])
+    assert [g["action"] for g in log["gate"]] == [backed] and log["output"]["proposed_actions"] == [backed]
+    assert log["c4_actions_blocked"] == [{"action": bare, "reason": "it cites no evidence"}]
+    assert all(g["executed"] is False for g in log["gate"])

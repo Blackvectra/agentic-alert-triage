@@ -94,3 +94,27 @@ def quarantine(records: list[dict]) -> list[dict]:
     flagged = set(c2.suspected_injections(records))
     return [{field: QUARANTINED if (r.get("evidence_id", "?"), field) in flagged else value
              for field, value in r.items()} for r in records]
+
+
+# Guard 3, action policy (ADR 0014). ADR 0006's scoring rule for recommendations, enforced while
+# the agent runs: an action needs a true_positive verdict and evidence this run retrieved. Actions
+# are free text, so no list of action types is enforced. What remains still only goes to the
+# approval gate, which never executes anything.
+def enforce_action_policy(answer: dict | None, retrieved_ids: set[str]) -> tuple[dict | None, list[dict]]:
+    """Return the answer with only the actions the policy allows, and each removed action with why."""
+    if not answer:
+        return answer, []
+    kept, blocked = [], []
+    for action in answer.get("proposed_actions", []):
+        ids = action.get("evidence_ids", [])
+        if answer.get("disposition") != "true_positive":
+            reason = f"the answer is {answer.get('disposition')}, not true_positive"
+        elif not ids:
+            reason = "it cites no evidence"
+        elif not set(ids) <= retrieved_ids:
+            reason = "it cites evidence no tool returned in this run"
+        else:
+            kept.append(action)
+            continue
+        blocked.append({"action": action, "reason": reason})
+    return dict(answer, proposed_actions=kept), blocked
