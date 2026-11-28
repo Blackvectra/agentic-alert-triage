@@ -214,5 +214,11 @@ def test_users_are_found_by_field_name_or_at_sign_and_list_values_one_by_one():
     assert len(missing) - len(searches) == 5  # one entity_lookup per value, GRP-1 and app-x included
 
 
+def test_a_destination_ip_needs_a_lookup_but_no_search_the_tool_cannot_do():
+    alert = {"entities": {"src_ip_1": "198.51.100.7", "dest_ip": "203.0.113.9"}}
+    assert missing_coverage(alert, []) == ["entity_lookup id=198.51.100.7", "entity_lookup id=203.0.113.9",
+                                           "event_search src_ip=198.51.100.7 (no event_type filter)"]
+
+
 def test_an_alert_without_entities_needs_nothing():
     assert missing_coverage({}, []) == []
