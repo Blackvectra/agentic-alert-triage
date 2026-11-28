@@ -325,7 +325,7 @@ def _alert_message(view: dict) -> str:
 
 
 def tools_for(config: str) -> list | None:
-    """Tool definitions a config sends: none for A, identical for B and C (ADR 0001)."""
+    """Tool definitions a config sends: none for A, identical for B, C, C2 and C3 (ADR 0001)."""
     return None if config == "A" else [{"name": n, **TOOL_SPECS[n]} for n in sorted(ALLOWED_TOOLS)]
 
 
@@ -508,7 +508,7 @@ def _parse_output(log: dict, config: str) -> None:
         log["output"], log["output_valid"] = out, True
     except (json.JSONDecodeError, jsonschema.ValidationError):
         log["output_valid"] = False
-        # B keeps whatever it can parse; C treats invalid output as an abstention.
+        # B keeps whatever it can parse; the guarded configs (C, C2, C3) treat it as an abstention.
         try:
             log["output"] = json.loads(text) if config not in GUARDED else None
         except json.JSONDecodeError:
