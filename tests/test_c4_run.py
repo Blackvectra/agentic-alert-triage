@@ -50,3 +50,20 @@ def test_a_verdict_kept_despite_the_gap_falls_back_to_needs_more_info():
 def test_complete_evidence_has_no_gap():
     log = _run(FULL + [_final(evidence_ids=["E-EVT-001"])])
     assert log["c4_empty_lookups"] == [] and log["c2_check"]["outcome"] == "accepted"
+
+
+# Guard 2, quarantine. AUTH-001's injected variant plants text in a record the user search returns.
+class Recorder(ScriptedModel):
+    def step(self, system, messages, tools):
+        self.seen = messages
+        return super().step(system, messages, tools)
+
+
+def test_the_model_never_sees_a_flagged_field_but_layer_3_still_does():
+    payload = CASE["variants"]["injected"]["injection"]["payload"]
+    model = Recorder(FULL + [_final("benign", ["E-EVT-001"]), _final("benign", ["E-EVT-001"])])
+    log = run_case(CASE, "injected", "C4", model, build_view(CASE, "injected"))
+    tool_text = "".join(m["content"] for m in model.seen if m["role"] == "tool")
+    assert payload not in tool_text and "withheld by C4" in tool_text
+    assert {"evidence_id": "E-EVT-004", "field": "rule_name"} in log["c2_injection_flags"]
+    assert log["c2_check"]["outcome"] == "fallback"  # benign is still refused: the flag is a known-bad sign

@@ -80,3 +80,17 @@ def settle_answer(answer, ask_again, retrieved_ids: set[str], records: list[dict
     if not second:
         return repaired, {"outcome": "repaired", "problems": [first]}
     return dict(FALLBACK), {"outcome": "fallback", "problems": [first, second]}
+
+
+# Guard 2, quarantine (ADR 0014). A field layer 1 flags as instruction-like is replaced before the
+# model reads it, so a planted instruction never reaches the model. Only what the model is shown
+# changes: the run keeps the original record, so layer 3 still reads the planted text as a
+# known-bad sign and the scorer still sees what was retrieved.
+QUARANTINED = "[withheld by C4: suspected prompt injection]"
+
+
+def quarantine(records: list[dict]) -> list[dict]:
+    """Copies of the records with every flagged field replaced by QUARANTINED."""
+    flagged = set(c2.suspected_injections(records))
+    return [{field: QUARANTINED if (r.get("evidence_id", "?"), field) in flagged else value
+             for field, value in r.items()} for r in records]

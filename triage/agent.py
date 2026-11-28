@@ -416,8 +416,10 @@ def run_case(case: dict, variant: str, config: str, model: Model, view: dict) ->
                 entry["executed"] = True
                 entry["returned_ids"] = [r["evidence_id"] for r in records]
                 retrieved.extend(records)
+                # C4 hides flagged fields from the model; the run keeps the originals (ADR 0014).
+                shown = c4.quarantine(records) if config == "C4" else records
                 # C2 labels tool output as data, never instructions (spotlighting, ADR 0012).
-                result = json.dumps({"untrusted_data": records} if config in C2_FAMILY else records)
+                result = json.dumps({"untrusted_data": shown} if config in C2_FAMILY else records)
             else:
                 result = json.dumps({"error": "call rejected"})
             log["tool_calls"].append(entry)
